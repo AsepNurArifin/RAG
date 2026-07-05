@@ -1,0 +1,243 @@
+"""
+Graph Builder — EnterpriseMind AI.
+
+Perakitan LangGraph multi-agent. SATU-SATUNYA tempat routing logic
+antar-agent didefinisikan (ref: ARCHITECTURE.md prinsip #3).
+
+Alur graph lengkap:
+    Orchestrator → Researcher → Verifier
+                                   ├── confidence >= threshold → Summarizer → [Executor?] → END
+                                   └── confidence < threshold → Reflection (reformulasi query)
+                                                                 → Researcher (ulang)
+                                                                 → Verifier (ulang)
+                                                                 → ... (maks 2 iterasi)
+                                                                 → Summarizer + disclaimer → END
+
+Ref: FR2 di SRS_PRD.md, ARCHITECTURE.md diagram alur query
+
+Usage:
+    from app.graph.build_graph import build_agent_graph
+
+    graph = build_agent_graph()
+    result = graph.invoke(initial_state)
+"""
+
+import logging
+
+from langgraph.graph import END, StateGraph
+
+from app.agents.executor import run_executor_agent
+from app.agents.orchestrator import run_orchestrator_agent
+from app.agents.researcher import run_researcher_agent
+from app.agents.summarizer import run_summarizer_agent
+from app.agents.verifier import run_verifier_agent
+from app.core.config import settings
+from app.graph.state import GraphState
+
+logger = logging.getLogger(__name__)
+
+
+def build_agent_graph() -> StateGraph:
+    """
+    Rakit graph multi-agent lengkap.
+
+    Returns:
+        Compiled StateGraph yang siap dijalankan via .invoke()
+
+    Side effects:
+        Tidak ada — pure function yang membuat graph definition.
+    """
+    logger.info("Building agent graph...")
+
+    graph = StateGraph(GraphState)
+
+    # ------------------------------------------------------------------ #
+    # Register Nodes (agent functions)
+    # ------------------------------------------------------------------ #
+    graph.add_node("orchestrator", run_orchestrator_agent)
+    graph.add_node("researcher", run_researcher_agent)
+    graph.add_node("verifier", run_verifier_agent)
+    graph.add_node("summarizer", run_summarizer_agent)
+    graph.add_node("executor", run_executor_agent)
+    graph.add_node("reflection", _reflection_node)
+
+    # ------------------------------------------------------------------ #
+    # Define Edges (routing logic)
+    # ------------------------------------------------------------------ #
+
+    # Entry point: selalu mulai dari Orchestrator
+    graph.set_entry_point("orchestrator")
+
+    # Orchestrator → routing berdasarkan intent
+    graph.add_conditional_edges(
+        "orchestrator",
+        _route_after_orchestrator,
+        {
+            "researcher": "researcher",
+            "summarizer": "summarizer",  # untuk out_of_scope
+        },
+    )
+
+    # Researcher → selalu ke Verifier
+    graph.add_edge("researcher", "verifier")
+
+    # Verifier → conditional: Summarizer atau Reflection
+    graph.add_conditional_edges(
+        "verifier",
+        _route_after_verifier,
+        {
+            "summarizer": "summarizer",
+            "reflection": "reflection",
+        },
+    )
+
+    # Reflection → kembali ke Researcher (retry dengan query baru)
+    graph.add_edge("reflection", "researcher")
+
+    # Summarizer → conditional: Executor atau END
+    graph.add_conditional_edges(
+        "summarizer",
+        _route_after_summarizer,
+        {
+            "executor": "executor",
+            "end": END,
+        },
+    )
+
+    # Executor → END
+    graph.add_edge("executor", END)
+
+    compiled = graph.compile()
+    logger.info("Agent graph compiled successfully.")
+    return compiled
+
+
+# ------------------------------------------------------------------ #
+# Routing Functions (HANYA di sini, bukan di agent)
+# ------------------------------------------------------------------ #
+
+
+def _route_after_orchestrator(state: GraphState) -> str:
+    """
+    Routing setelah Orchestrator: ke Researcher atau langsung Summarizer.
+
+    Ref: FR2.2 — Orchestrator menentukan agent yang diaktifkan.
+    """
+    intent = state.get("intent", "informational")
+
+    if intent == "out_of_scope":
+        logger.info("[Router] Intent=out_of_scope → langsung ke Summarizer")
+        return "summarizer"
+
+    logger.info("[Router] Intent=%s → ke Researcher", intent)
+    return "researcher"
+
+
+def _route_after_verifier(state: GraphState) -> str:
+    """
+    Routing setelah Verifier: ke Summarizer atau Reflection loop.
+
+    Ref: FR2.5 — Reflection loop jika confidence rendah, maks 2 iterasi.
+    """
+    needs_reflection = state.get("needs_reflection", False)
+    reflection_count = state.get("reflection_count", 0)
+    confidence = state.get("confidence_score", 0.0)
+
+    if needs_reflection and reflection_count < settings.MAX_REFLECTION_ITERATIONS:
+        logger.info(
+            "[Router] Confidence=%.2f < threshold=%.2f, "
+            "reflection #%d → Reflection",
+            confidence,
+            settings.CONFIDENCE_THRESHOLD,
+            reflection_count + 1,
+        )
+        return "reflection"
+
+    if reflection_count >= settings.MAX_REFLECTION_ITERATIONS:
+        logger.info(
+            "[Router] Max reflection reached (%d), "
+            "proceeding to Summarizer with disclaimer",
+            reflection_count,
+        )
+
+    return "summarizer"
+
+
+def _route_after_summarizer(state: GraphState) -> str:
+    """
+    Routing setelah Summarizer: ke Executor atau END.
+
+    Ref: FR2.7 — Executor hanya jika intent = action_request.
+    """
+    intent = state.get("intent", "")
+    agents = state.get("agents_to_activate", [])
+
+    if intent == "action_request" and "executor" in agents:
+        logger.info("[Router] Intent=action_request → ke Executor")
+        return "executor"
+
+    return "end"
+
+
+# ------------------------------------------------------------------ #
+# Reflection Node
+# ------------------------------------------------------------------ #
+
+
+def _reflection_node(state: GraphState) -> GraphState:
+    """
+    Node reflection: reformulasi query untuk retrieval ulang.
+
+    Meningkatkan reflection_count dan mencoba reformulasi query
+    agar Researcher mendapat hasil yang lebih baik.
+
+    Args:
+        state: State saat ini dengan confidence rendah.
+
+    Returns:
+        State dengan reformulated_query dan reflection_count bertambah.
+    """
+    query = state.get("query", "")
+    reflection_count = state.get("reflection_count", 0)
+    flagged_issues = state.get("flagged_issues", [])
+
+    new_count = reflection_count + 1
+
+    # Reformulasi query berdasarkan issues
+    reformulated = _reformulate_query(query, flagged_issues, new_count)
+
+    logger.info(
+        "[Reflection] Iteration #%d: '%s...' → '%s...'",
+        new_count,
+        query[:40],
+        reformulated[:40],
+    )
+
+    return {
+        **state,
+        "reformulated_query": reformulated,
+        "reflection_count": new_count,
+        "needs_reflection": False,  # Reset untuk iterasi berikutnya
+    }
+
+
+def _reformulate_query(
+    original_query: str,
+    issues: list[str],
+    iteration: int,
+) -> str:
+    """
+    Reformulasi query berdasarkan masalah yang ditemukan.
+
+    Strategi sederhana: tambahkan konteks dari issues ke query.
+    Bisa di-upgrade nanti dengan LLM-based reformulation.
+    """
+    if issues:
+        context = "; ".join(issues[:3])  # Ambil 3 issue teratas
+        return (
+            f"{original_query} "
+            f"(konteks tambahan: {context})"
+        )
+
+    # Fallback: tambahkan variasi kata kunci
+    return f"{original_query} (detail lebih spesifik, iterasi {iteration})"

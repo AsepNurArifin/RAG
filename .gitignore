@@ -1,0 +1,59 @@
+# ============================================
+# EnterpriseMind AI — Root .gitignore
+# ============================================
+
+# Environment & secrets — CRITICAL: never commit!
+.env
+.env.*
+!.env.example
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+
+# Chroma persistent storage
+chroma_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Vercel
+.vercel
+
+# Misc
+*.tmp
+*.bak

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: enterprisemind_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - chroma_data:/app/chroma_db
+      - uploads:/app/uploads
+    depends_on:
+      chroma:
+        condition: service_healthy
+    networks:
+      - enterprisemind_net
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: enterprisemind_chroma
+    ports:
+      - "8001:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - enterprisemind_net
+
+volumes:
+  chroma_data:
+    driver: local
+  uploads:
+    driver: local
+
+networks:
+  enterprisemind_net:
+    driver: bridge
