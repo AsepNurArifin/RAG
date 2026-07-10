@@ -51,13 +51,19 @@ class UpdateUserRequest(BaseModel):
 
 
 @router.get("")
-async def list_users(admin: dict = Depends(require_admin)):
-    """List semua user. Hanya admin."""
+async def list_users(
+    limit: int = 50,
+    offset: int = 0,
+    admin: dict = Depends(require_admin),
+):
+    """List semua user dengan pagination. Hanya admin."""
     client = get_supabase_client()
     result = (
         client.table("users")
         .select("id, email, full_name, role, is_active, created_at")
         .order("created_at", desc=True)
+        .limit(limit)
+        .range(offset, offset + limit - 1)
         .execute()
     )
     return result.data

@@ -12,8 +12,10 @@ import logging
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.core.auth import get_current_user
+from app.core.config import settings
 from app.ingestion.pipeline import run_ingestion_pipeline
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,7 @@ router = APIRouter(prefix="/api", tags=["Upload"])
 async def upload_document(
     file: UploadFile = File(...),
     category: str = Form(default="uncategorized"),
+    user: dict = Depends(get_current_user),
 ) -> dict:
     """
     Upload dan proses satu file dokumen.
@@ -45,10 +48,22 @@ async def upload_document(
         }
 
     Raises:
-        HTTPException 400: Jika tipe file tidak didukung.
+        HTTPException 400: Jika tipe file tidak didukung atau ukuran terlalu besar.
         HTTPException 500: Jika proses ingestion gagal.
     """
-    # Validasi tipe file
+    # Validasi content-type
+    ALLOWED_TYPES = {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+    }
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipe MIME '{file.content_type}' tidak didukung.",
+        )
+
+    # Validasi tipe file ekstensi
     filename = file.filename or "unknown"
     ext = Path(filename).suffix.lower().strip(".")
     supported = {"pdf", "docx", "txt"}
@@ -68,6 +83,13 @@ async def upload_document(
     try:
         content = await file.read()
         file_size = len(content)
+        
+        max_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        if file_size > max_size_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ukuran file maksimal yang diizinkan adalah {settings.MAX_UPLOAD_SIZE_MB}MB.",
+            )
 
         with tempfile.NamedTemporaryFile(
             delete=False, suffix=f".{ext}"

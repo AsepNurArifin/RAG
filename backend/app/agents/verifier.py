@@ -22,6 +22,7 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.agents import VERIFIER_PROMPT
+from app.agents.utils import format_documents_for_prompt
 from app.core.config import settings
 from app.core.llm_provider import get_llm
 from app.core.observability import get_callbacks
@@ -92,7 +93,7 @@ def run_verifier_agent(state: GraphState) -> GraphState:
     response = chain.invoke(
         {
             "query": query,
-            "documents": _format_documents(documents),
+            "documents": format_documents_for_prompt(documents),
         },
         config={"callbacks": callbacks},
     )
@@ -111,16 +112,47 @@ def run_verifier_agent(state: GraphState) -> GraphState:
             "needs_reflection": False,
         }
 
-    confidence = result["confidence_score"]
+    # Hitung skor confidence secara objektif
+    llm_confidence = result.get("confidence_score", 0.5)
+    flagged_issues = result.get("flagged_issues", [])
+    
+    # 1. Rata-rata relevance score dari search engine
+    #    Hybrid search scores biasanya 0.3-0.6 (bukan 0.8-1.0),
+    #    jadi kita normalisasi ke range yang lebih realistis
+    relevance_scores = [doc.get("relevance_score", 0.0) for doc in documents]
+    avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
+    # Normalisasi: skor 0.3+ dianggap relevan, mapping ke 0.6-1.0
+    normalized_relevance = min(1.0, avg_relevance / 0.5) if avg_relevance > 0 else 0.0
+    
+    # 2. Bonus jumlah dokumen pendukung (0.0 - 1.0)
+    doc_bonus = min(len(documents) / 3.0, 1.0)
+    
+    # 3. Penalti kontradiksi — lebih lunak, maks 0.15
+    penalty = min(0.05 * len(flagged_issues), 0.15)
+    
+    # Formula: LLM confidence dominan (dia yang baca dokumen)
+    # + relevance sebagai penguat + doc bonus kecil - penalty kecil
+    objective_confidence = (
+        0.55 * llm_confidence
+        + 0.30 * normalized_relevance
+        + 0.15 * doc_bonus
+        - penalty
+    )
+    confidence = max(0.0, min(1.0, round(objective_confidence, 2)))
+
     needs_reflection = (
         confidence < settings.CONFIDENCE_THRESHOLD
         and reflection_count < settings.MAX_REFLECTION_ITERATIONS
     )
 
     logger.info(
-        "[Verifier] Confidence=%.2f, Issues=%d, NeedsReflection=%s",
+        "[Verifier] Confidence=%.2f (LLM=%.2f, AvgRel=%.2f, NormRel=%.2f, DocCount=%d), Issues=%d, NeedsReflection=%s",
         confidence,
-        len(result.get("flagged_issues", [])),
+        llm_confidence,
+        avg_relevance,
+        normalized_relevance,
+        len(documents),
+        len(flagged_issues),
         needs_reflection,
     )
 
@@ -128,24 +160,9 @@ def run_verifier_agent(state: GraphState) -> GraphState:
         **state,
         "confidence_score": confidence,
         "verified_claims": result.get("verified_claims", []),
-        "flagged_issues": result.get("flagged_issues", []),
+        "flagged_issues": flagged_issues,
         "needs_reflection": needs_reflection,
     }
-
-
-def _format_documents(documents: list[dict]) -> str:
-    """Format dokumen untuk prompt context."""
-    lines = []
-    for i, doc in enumerate(documents, 1):
-        source = doc.get("source", "unknown")
-        date = doc.get("date", "N/A")
-        content = doc.get("content", "")[:500]  # Truncate per doc
-        lines.append(
-            f"--- Dokumen {i} ---\n"
-            f"Sumber: {source} (tanggal: {date})\n"
-            f"Konten: {content}\n"
-        )
-    return "\n".join(lines)
 
 
 def _parse_verifier_response(response_text: str) -> dict:

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { DocumentTable } from "../../components/admin/DocumentTable";
 import { DocumentUploader } from "../../components/admin/DocumentUploader";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { motion } from "framer-motion";
 
 export default function KnowledgeVaultPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -12,31 +14,44 @@ export default function KnowledgeVaultPage() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto py-8">
-      <div className="mb-6 flex justify-between items-end">
-        <div>
-          <h2 className="font-h3 text-h3 text-on-surface">Knowledge Vault</h2>
-          <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-            Manage your internal documents and metadata.
-          </p>
-        </div>
-      </div>
+    <div className="w-full min-w-0">
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6 md:mb-8"
+      >
+        <h2 className="text-xl md:text-3xl font-bold tracking-tight text-slate-900">Knowledge Vault</h2>
+        <p className="text-slate-500 mt-2 text-sm">
+          Kelola dokumen internal dan metadata sistem perusahaan.
+        </p>
+      </motion.div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-surface-container border-instrument rounded p-6">
-            <DocumentTable refreshTrigger={refreshTrigger} />
-          </div>
-        </div>
+      <div className="flex flex-col gap-6 md:gap-8">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card className="shadow-sm border-slate-200 bg-[#e6f0fa] overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-[#e6f0fa] pb-4">
+              <CardTitle className="text-lg text-slate-900">Daftar Dokumen</CardTitle>
+              <CardDescription className="text-slate-500 text-sm">Semua dokumen yang terindeks dalam sistem</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="p-4 md:p-6 overflow-x-auto">
+                <DocumentTable refreshTrigger={refreshTrigger} />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-surface-container border-instrument rounded p-6">
-            <h3 className="font-data-label text-data-label text-outline mb-4 uppercase tracking-wider">
-              Upload Document
-            </h3>
-            <DocumentUploader onUploadComplete={handleUploadComplete} />
-          </div>
-        </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card className="shadow-sm border-slate-200 bg-[#e6f0fa] overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-[#e6f0fa] pb-4">
+              <CardTitle className="text-lg text-slate-900">Unggah Dokumen Baru</CardTitle>
+              <CardDescription className="text-slate-500 text-sm truncate">Tambahkan dokumen PDF, Word, atau teks ke dalam Knowledge Vault</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6">
+              <DocumentUploader onUploadComplete={handleUploadComplete} />
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

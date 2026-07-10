@@ -18,7 +18,16 @@ git clone https://github.com/username/enterprisemind-ai.git
 cd enterprisemind-ai/backend
 ```
 
-### 1.2 Konfigurasi environment
+### 1.2 Setup Firewall (UFW)
+Sangat penting untuk menutup port yang tidak diperlukan.
+```bash
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw enable
+```
+
+### 1.3 Konfigurasi environment
 ```bash
 cp .env.example .env
 nano .env
@@ -42,18 +51,18 @@ CORS_ORIGINS=https://enterprisemind-ai.vercel.app
 RATE_LIMIT_PER_MINUTE=30
 ```
 
-### 1.3 Jalankan Docker Compose
+### 1.4 Jalankan Docker Compose
 ```bash
 docker compose up -d --build
 ```
 
-### 1.4 Verifikasi
+### 1.5 Verifikasi
 ```bash
 curl http://localhost:8000/health
 # Harus return: {"status":"healthy","app":"EnterpriseMind AI"...}
 ```
 
-### 1.5 Setup Nginx Reverse Proxy (opsional, untuk HTTPS)
+### 1.6 Setup Nginx Reverse Proxy & HTTPS (Wajib)
 ```nginx
 server {
     listen 80;
@@ -68,6 +77,20 @@ server {
     }
 }
 ```
+
+Aktifkan konfigurasi Nginx:
+```bash
+sudo ln -s /etc/nginx/sites-available/enterprisemind /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Install Certbot dan dapatkan sertifikat SSL:
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d api-enterprisemind.domain-anda.com
+```
+Certbot otomatis akan memodifikasi file Nginx Anda untuk menerapkan enkripsi HTTPS yang kuat.
 
 ---
 

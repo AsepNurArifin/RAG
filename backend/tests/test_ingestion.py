@@ -53,6 +53,72 @@ class TestExtractor:
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
+    @patch("fitz.open")
+    def test_extract_pdf_digital(self, mock_fitz_open):
+        """Test ekstrak PDF digital tanpa OCR."""
+        mock_doc = MagicMock()
+        mock_page = MagicMock()
+        mock_page.get_text.return_value = "Ini adalah teks digital yang cukup panjang sehingga tidak perlu OCR."
+        # Iterator mock doc yields the page
+        mock_doc.__iter__.return_value = [mock_page]
+        mock_doc.__len__.return_value = 1
+        mock_fitz_open.return_value = mock_doc
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            tmp_path = f.name
+
+        try:
+            result = extract_text(tmp_path, "pdf")
+            assert "teks digital" in result
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    @patch("fitz.open")
+    @patch("pytesseract.image_to_string")
+    @patch("pdf2image.convert_from_path")
+    def test_extract_pdf_ocr(self, mock_convert, mock_tesseract, mock_fitz_open):
+        """Test ekstrak PDF hasil scan (OCR fallback)."""
+        mock_doc = MagicMock()
+        mock_page = MagicMock()
+        # Mengembalikan teks kosong untuk memicu OCR
+        mock_page.get_text.return_value = "   "
+        mock_doc.__iter__.return_value = [mock_page]
+        mock_doc.__len__.return_value = 1
+        mock_fitz_open.return_value = mock_doc
+
+        mock_convert.return_value = ["mock_image"]
+        mock_tesseract.return_value = "Ini adalah teks hasil OCR scan."
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            tmp_path = f.name
+
+        try:
+            result = extract_text(tmp_path, "pdf")
+            assert "hasil OCR" in result
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    @patch("docx.Document")
+    def test_extract_docx(self, mock_docx):
+        """Test ekstrak DOCX."""
+        mock_doc = MagicMock()
+        mock_para1 = MagicMock()
+        mock_para1.text = "Paragraf satu."
+        mock_para2 = MagicMock()
+        mock_para2.text = "Paragraf dua."
+        mock_doc.paragraphs = [mock_para1, mock_para2]
+        mock_docx.return_value = mock_doc
+
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
+            tmp_path = f.name
+
+        try:
+            result = extract_text(tmp_path, "docx")
+            assert "Paragraf satu." in result
+            assert "Paragraf dua." in result
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
     def test_detect_file_type_pdf(self):
         """Harus mendeteksi tipe file dari nama file."""
         assert detect_file_type("document.pdf") == "pdf"

@@ -77,7 +77,7 @@ class GraphState(TypedDict):
     """Apakah perlu reflection loop (confidence < threshold)."""
 
     reflection_count: int
-    """Counter iterasi reflection loop (maks sesuai config)."""
+    """Counter iterasi reflection loop (maks sesuai config). Default 0."""
 
     # ------------------------------------------------------------------ #
     # Summarizer Output
@@ -108,3 +108,6 @@ class GraphState(TypedDict):
     # ------------------------------------------------------------------ #
     error: str | None
     """Pesan error jika terjadi kegagalan di salah satu agent."""
+
+    query_deadline: float
+    """Timestamp deadline untuk query timeout (epoch seconds)."""

@@ -79,31 +79,53 @@ def _extract_txt(path: Path) -> str:
 
 def _extract_pdf(path: Path) -> str:
     """
-    Ekstrak teks dari file .pdf menggunakan unstructured.
-
-    Side effects:
-        Import dan panggil library `unstructured` (I/O intensif).
+    Ekstrak teks dari file .pdf menggunakan PyMuPDF (fitz) secara hybrid.
+    Jika teks per halaman terlalu sedikit (<50 char), lakukan OCR dengan pytesseract.
     """
-    from unstructured.partition.pdf import partition_pdf
+    import fitz  # PyMuPDF
+    import pytesseract
+    from pdf2image import convert_from_path
 
-    elements = partition_pdf(filename=str(path), strategy="fast")
-    text = "\n\n".join(str(el) for el in elements)
-    logger.info("PDF ekstraksi selesai: %d elemen, %d karakter", len(elements), len(text))
-    return text
+    doc = fitz.open(str(path))
+    try:
+        full_text = []
+        
+        # We will track if we need to fall back to OCR for any page
+        for page_num, page in enumerate(doc):
+            text = page.get_text("text").strip()
+            
+            # Threshold: if less than 50 chars, it might be a scanned image
+            if len(text) < 50:
+                logger.info("Teks kurang dari 50 karakter di halaman %d, menggunakan OCR...", page_num + 1)
+                try:
+                    # Convert this specific page to image
+                    # (pdf2image uses 1-based index for first_page and last_page)
+                    images = convert_from_path(str(path), first_page=page_num + 1, last_page=page_num + 1)
+                    if images:
+                        ocr_text = pytesseract.image_to_string(images[0], lang="eng+ind")
+                        text = ocr_text.strip()
+                except Exception as e:
+                    logger.warning("OCR gagal di halaman %d: %s", page_num + 1, e)
+                    
+            full_text.append(text)
+            
+        final_text = "\n\n".join(full_text)
+        logger.info("PDF ekstraksi selesai: %d halaman, %d karakter", len(doc), len(final_text))
+        return final_text
+    finally:
+        doc.close()
 
 
 def _extract_docx(path: Path) -> str:
     """
-    Ekstrak teks dari file .docx menggunakan unstructured.
-
-    Side effects:
-        Import dan panggil library `unstructured` (I/O intensif).
+    Ekstrak teks dari file .docx menggunakan python-docx.
     """
-    from unstructured.partition.docx import partition_docx
+    import docx
 
-    elements = partition_docx(filename=str(path))
-    text = "\n\n".join(str(el) for el in elements)
-    logger.info("DOCX ekstraksi selesai: %d elemen, %d karakter", len(elements), len(text))
+    doc = docx.Document(str(path))
+    text = "\n\n".join(paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip())
+    
+    logger.info("DOCX ekstraksi selesai: %d paragraf, %d karakter", len(doc.paragraphs), len(text))
     return text
 
 

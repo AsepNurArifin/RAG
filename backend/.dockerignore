@@ -1,0 +1,31 @@
+# Environment variables
+.env
+.env.example
+.env.*
+
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Git
+.git/
+.gitignore
+
+# Tests
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Miscellaneous
+*.log
+*.tmp
+*.bak
+docker-compose.override.yml

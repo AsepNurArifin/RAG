@@ -14,7 +14,10 @@ import logging
 import time
 import uuid
 
+import asyncio
+import json
 from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -97,7 +100,7 @@ class QueryResponse(BaseModel):
 # ------------------------------------------------------------------ #
 
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query")
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def process_query(
     request: Request,
@@ -120,130 +123,114 @@ async def process_query(
         HTTPException 500: Jika proses query gagal.
         HTTPException 429: Jika rate limit terlampaui.
     """
-    start_time = time.time()
-
-    logger.info(
-        "[Query API] Diterima: query='%s...', session=%s",
-        body.query[:80],
-        body.session_id,
-    )
-
-    try:
-        graph = _get_graph()
-
-        # Initial state
-        initial_state = {
-            "query": body.query,
-            "session_id": body.session_id,
-            "intent": "",
-            "agents_to_activate": [],
-            "orchestrator_reasoning": "",
-            "retrieved_documents": [],
-            "reformulated_query": "",
-            "verified_claims": [],
-            "flagged_issues": [],
-            "confidence_score": 0.0,
-            "needs_reflection": False,
-            "reflection_count": 0,
-            "final_answer": "",
-            "citations": [],
-            "action_items": [],
-            "conversation_history": [],
-            "error": None,
-        }
-
-        # Run graph
-        result = graph.invoke(initial_state)
-
-        elapsed_ms = int((time.time() - start_time) * 1000)
-
-        # Log query untuk metrik dashboard (FR7.1)
+    async def event_generator():
+        start_time = time.time()
+        
         try:
-            await log_query(
-                query=body.query,
-                intent=result.get("intent", ""),
-                agents_activated=result.get("agents_to_activate", []),
-                latency_ms=elapsed_ms,
-                confidence_score=result.get("confidence_score", 0),
-                reflection_count=result.get("reflection_count", 0),
-                model_used=settings.REASONING_MODEL,
-            )
-        except Exception as e:
-            logger.warning("Gagal log query ke Supabase: %s", e)
+            graph = _get_graph()
+            
+            initial_state = {
+                "query": body.query,
+                "session_id": body.session_id,
+                "intent": "",
+                "agents_to_activate": [],
+                "orchestrator_reasoning": "",
+                "retrieved_documents": [],
+                "reformulated_query": "",
+                "verified_claims": [],
+                "flagged_issues": [],
+                "confidence_score": 0.0,
+                "needs_reflection": False,
+                "reflection_count": 0,
+                "final_answer": "",
+                "citations": [],
+                "action_items": [],
+                "conversation_history": [],
+                "error": None,
+                "query_deadline": time.time() + settings.QUERY_TIMEOUT_SECONDS,
+            }
+            
+            # We will accumulate the state as we stream
+            current_state = initial_state.copy()
+            
+            async for output in graph.astream(initial_state):
+                for node_name, state_update in output.items():
+                    # Send agent activation event
+                    yield f"data: {json.dumps({'type': 'agent', 'agent': node_name})}\n\n"
+                    await asyncio.sleep(0.01)
+                    # Update our current state with the deltas
+                    current_state.update(state_update)
+            
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            
+            # Log query to DB
+            try:
+                await log_query(
+                    query=body.query,
+                    intent=current_state.get("intent", ""),
+                    agents_activated=current_state.get("agents_to_activate", []),
+                    latency_ms=elapsed_ms,
+                    confidence_score=current_state.get("confidence_score", 0),
+                    reflection_count=current_state.get("reflection_count", 0),
+                    model_used=settings.REASONING_MODEL,
+                )
+            except Exception as e:
+                logger.warning("Gagal log query ke Supabase: %s", e)
 
-        logger.info(
-            "[Query API] Selesai: intent=%s, confidence=%.2f, "
-            "latency=%dms, reflections=%d",
-            result.get("intent", ""),
-            result.get("confidence_score", 0),
-            elapsed_ms,
-            result.get("reflection_count", 0),
-        )
-
-        # Ensure conversation record exists and save messages
-        try:
-            client = get_supabase_client()
-
-            # Check if conversation exists
-            conv_result = (
-                client.table("conversations")
-                .select("id")
-                .eq("session_id", body.session_id)
-                .execute()
-            )
-
-            if conv_result.data:
-                conversation_id = conv_result.data[0]["id"]
-            else:
-                # Create new conversation
-                title = body.query[:60] + ("..." if len(body.query) > 60 else "")
-                conv_insert = (
-                    client.table("conversations")
-                    .insert({
+            # Save to conversations
+            try:
+                client = get_supabase_client()
+                conv_result = client.table("conversations").select("id").eq("session_id", body.session_id).execute()
+                if conv_result.data:
+                    conversation_id = conv_result.data[0]["id"]
+                else:
+                    title = body.query[:60] + ("..." if len(body.query) > 60 else "")
+                    conv_insert = client.table("conversations").insert({
                         "session_id": body.session_id,
                         "user_id": user["id"],
                         "title": title,
-                    })
-                    .execute()
+                    }).execute()
+                    conversation_id = conv_insert.data[0]["id"]
+
+                await save_message(conversation_id=conversation_id, role="user", content=body.query)
+                await save_message(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=current_state.get("final_answer", ""),
+                    citations=current_state.get("citations", []),
+                    confidence_score=current_state.get("confidence_score", 0),
+                    action_items=current_state.get("action_items", []),
+                    latency_ms=elapsed_ms,
+                    model_used=settings.REASONING_MODEL,
                 )
-                conversation_id = conv_insert.data[0]["id"]
+            except Exception as e:
+                logger.warning("Gagal menyimpan pesan ke DB: %s", e)
 
-            # Save user message
-            await save_message(
-                conversation_id=conversation_id,
-                role="user",
-                content=body.query,
-            )
-
-            # Save assistant message
-            await save_message(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=result.get("final_answer", ""),
-                citations=result.get("citations", []),
-                confidence_score=result.get("confidence_score", 0),
-                action_items=result.get("action_items", []),
-                latency_ms=elapsed_ms,
-                model_used=settings.REASONING_MODEL,
-            )
+            # Yield final result
+            final_answer = current_state.get("final_answer") or "Maaf, gagal memproses pertanyaan."
+            final_response = {
+                "type": "result",
+                "answer": final_answer,
+                "citations": current_state.get("citations", []),
+                "action_items": current_state.get("action_items", []),
+                "confidence_score": current_state.get("confidence_score", 0),
+                "intent": current_state.get("intent", ""),
+                "reflection_count": current_state.get("reflection_count", 0),
+                "latency_ms": elapsed_ms,
+                "session_id": body.session_id,
+            }
+            yield f"data: {json.dumps(final_response)}\n\n"
+            
         except Exception as e:
-            logger.warning("Gagal menyimpan pesan ke DB: %s", e)
+            logger.exception("[Query API] Error: %s", e)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
-        return QueryResponse(
-            answer=result.get("final_answer", "Maaf, gagal memproses pertanyaan."),
-            citations=result.get("citations", []),
-            action_items=result.get("action_items", []),
-            confidence_score=result.get("confidence_score", 0),
-            intent=result.get("intent", ""),
-            reflection_count=result.get("reflection_count", 0),
-            latency_ms=elapsed_ms,
-            session_id=body.session_id,
-        )
-
-    except Exception as e:
-        elapsed_ms = int((time.time() - start_time) * 1000)
-        logger.exception("[Query API] Error: %s", e)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Gagal memproses pertanyaan: {str(e)}",
-        ) from e
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )

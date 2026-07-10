@@ -11,7 +11,17 @@ import logging
 
 from langchain_community.tools.tavily_search import TavilySearchResults
 
+import re
+
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_content(content: str, max_length: int = 1000) -> str:
+    """Bersihkan tag HTML, script, dan batasi panjang teks."""
+    content = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.DOTALL | re.IGNORECASE)
+    content = re.sub(r"<[^>]+>", "", content)
+    content = re.sub(r"javascript:", "", content, flags=re.IGNORECASE)
+    return content[:max_length]
 
 
 def web_search(query: str, max_results: int = 3) -> list[dict]:
@@ -35,9 +45,11 @@ def web_search(query: str, max_results: int = 3) -> list[dict]:
         # Format ke bentuk standar
         formatted_results = []
         for res in results:
+            url = res.get("url", "")
+            safe_url = url if url.startswith(("http://", "https://")) else ""
             formatted_results.append({
-                "url": res.get("url", ""),
-                "content": res.get("content", ""),
+                "url": safe_url,
+                "content": _sanitize_content(res.get("content", "")),
             })
             
         return formatted_results

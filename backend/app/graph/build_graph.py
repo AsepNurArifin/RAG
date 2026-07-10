@@ -23,12 +23,13 @@ Usage:
 """
 
 import logging
+import time
 
 from langgraph.graph import END, StateGraph
 
 from app.agents.executor import run_executor_agent
 from app.agents.orchestrator import run_orchestrator_agent
-from app.agents.researcher import run_researcher_agent
+from app.agents.retriever import run_retriever_agent
 from app.agents.summarizer import run_summarizer_agent
 from app.agents.verifier import run_verifier_agent
 from app.core.config import settings
@@ -54,11 +55,11 @@ def build_agent_graph() -> StateGraph:
     # ------------------------------------------------------------------ #
     # Register Nodes (agent functions)
     # ------------------------------------------------------------------ #
-    graph.add_node("orchestrator", run_orchestrator_agent)
-    graph.add_node("researcher", run_researcher_agent)
-    graph.add_node("verifier", run_verifier_agent)
-    graph.add_node("summarizer", run_summarizer_agent)
-    graph.add_node("executor", run_executor_agent)
+    graph.add_node("orchestrator", _timed_node(run_orchestrator_agent, "Orchestrator"))
+    graph.add_node("researcher", _timed_node(run_retriever_agent, "Researcher"))
+    graph.add_node("verifier", _timed_node(run_verifier_agent, "Verifier"))
+    graph.add_node("summarizer", _timed_node(run_summarizer_agent, "Summarizer"))
+    graph.add_node("executor", _timed_node(run_executor_agent, "Executor"))
     graph.add_node("reflection", _reflection_node)
 
     # ------------------------------------------------------------------ #
@@ -110,6 +111,34 @@ def build_agent_graph() -> StateGraph:
     compiled = graph.compile()
     logger.info("Agent graph compiled successfully.")
     return compiled
+
+
+# ------------------------------------------------------------------ #
+# Node Timing Wrapper (enforce QUERY_TIMEOUT_SECONDS)
+# ------------------------------------------------------------------ #
+
+
+def _timed_node(func, name: str):
+    """Wrapper: catat elapsed time per node, enforce deadline via query_deadline."""
+    def wrapper(state: GraphState):
+        t0 = time.time()
+        deadline = state.get("query_deadline", 0)
+        if deadline and time.time() > deadline:
+            logger.warning("[%s] Query deadline exceeded, returning state", name)
+            return {
+                **state,
+                "error": f"Query timeout setelah {settings.QUERY_TIMEOUT_SECONDS}s",
+                "final_answer": (
+                    "Maaf, pemrosesan pertanyaan Anda memakan waktu terlalu lama "
+                    "dan melebihi batas waktu. Silakan coba lagi dengan pertanyaan "
+                    "yang lebih spesifik."
+                ),
+            }
+        result = func(state)
+        elapsed = time.time() - t0
+        logger.info("[%s] Selesai dalam %.2fs", name, elapsed)
+        return result
+    return wrapper
 
 
 # ------------------------------------------------------------------ #

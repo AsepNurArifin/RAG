@@ -174,6 +174,7 @@ async def get_all_documents() -> list[dict[str, Any]]:
         client.table("documents")
         .select("*")
         .order("created_at", desc=True)
+        .limit(100)
         .execute()
     )
     return result.data

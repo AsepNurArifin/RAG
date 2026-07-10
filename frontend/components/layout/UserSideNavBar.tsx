@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Plus, History, LogOut, User, Trash2, MessageSquare } from "lucide-react";
+import { Plus, History, LogOut, User, Trash2, MessageSquare, Menu, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
+import { motion, AnimatePresence } from "framer-motion";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 
 interface Session {
   id: string;
@@ -16,17 +20,19 @@ interface Session {
 
 interface UserSideNavBarProps {
   onNewChat?: () => void;
+  onToggleSidebar?: (open: boolean) => void;
+  isSidebarOpen?: boolean;
 }
 
-export function UserSideNavBar({ onNewChat }: UserSideNavBarProps) {
+export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = false }: UserSideNavBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeSessionId = searchParams.get("session") || undefined;
   const { user, logout } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
-  // Load sessions
   useEffect(() => {
     loadSessions();
   }, []);
@@ -44,17 +50,23 @@ export function UserSideNavBar({ onNewChat }: UserSideNavBarProps) {
     }
   };
 
-  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+  const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    if (!confirm("Hapus riwayat percakapan ini?")) return;
+    setSessionToDelete(sessionId);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
     try {
-      await api.deleteSession(sessionId);
-      setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
-      if (activeSessionId === sessionId) {
+      await api.deleteSession(sessionToDelete);
+      setSessions((prev) => prev.filter((s) => s.session_id !== sessionToDelete));
+      if (activeSessionId === sessionToDelete) {
         router.push("/");
       }
     } catch (err) {
       console.error("Failed to delete session:", err);
+    } finally {
+      setSessionToDelete(null);
     }
   };
 
@@ -66,48 +78,63 @@ export function UserSideNavBar({ onNewChat }: UserSideNavBarProps) {
     }
   };
 
-  return (
-    <nav className="bg-surface dark:bg-surface w-sidebar-width h-full fixed left-0 top-0 border-r border-outline-variant dark:border-outline-variant bg-surface-container-low flex flex-col py-margin px-4 z-20">
+  const handleSessionClick = (sessionId: string) => {
+    router.push(`/?session=${sessionId}`);
+    onToggleSidebar?.(false);
+  };
+
+  const sidebarContent = (
+    <nav className="w-[280px] h-full flex flex-col py-6 px-4">
       {/* Header */}
-      <div className="mb-6 pl-4">
-        <h1 className="font-h2 text-h2 font-semibold text-primary dark:text-primary mb-1">
-          EnterpriseMind AI
-        </h1>
-        <p className="font-data-label text-data-label text-secondary flex items-center">
-          <span className="w-2 h-2 rounded-full bg-cyan mr-2 inline-block shadow-[0_0_8px_rgba(79,168,184,0.6)]"></span>
-          System Active
-        </p>
+      <div className="mb-6 pl-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-white mb-1">
+            EnterpriseMind AI
+          </h1>
+          <p className="text-xs font-medium text-blue-100 flex items-center">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
+            System Active
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onToggleSidebar?.(false)}
+          className="md:hidden text-white hover:bg-blue-800/60 h-8 w-8"
+        >
+          <X className="w-5 h-5" />
+        </Button>
       </div>
 
       {/* New Analysis Button */}
-      <button 
+      <Button 
         onClick={handleNewChat}
-        className="w-full bg-brass text-on-primary font-body-sm text-body-sm font-semibold py-3 rounded-DEFAULT mb-4 hover:brightness-110 transition-all flex justify-center items-center scale-98 active:opacity-80 gap-2 cursor-pointer"
+        className="w-full bg-[#F2C300] hover:bg-[#d8a815] text-slate-900 font-bold py-3 gap-2 mb-6 shadow-sm border border-yellow-400/50"
       >
-        <Plus className="w-4 h-4 text-on-primary" />
+        <Plus className="w-4 h-4 text-slate-900" />
         New Analysis
-      </button>
+      </Button>
 
       {/* Mission Logs Header */}
-      <div className="flex items-center gap-2 pl-4 mb-2">
-        <History className="w-4 h-4 text-on-surface-variant" />
-        <span className="font-data-label text-data-label text-on-surface-variant uppercase tracking-widest">
+      <div className="flex items-center gap-2 pl-2 mb-3">
+        <History className="w-4 h-4 text-blue-200" />
+        <span className="text-xs font-semibold text-blue-200 uppercase tracking-wider">
           Mission Logs
         </span>
       </div>
 
       {/* Session List */}
-      <div className="flex-grow overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+      <div className="flex-grow overflow-y-auto space-y-1 pr-1"> 
         {isLoadingSessions ? (
           <div className="text-center py-4">
-            <span className="font-body-sm text-body-sm text-on-surface-variant opacity-50">
+            <span className="text-sm text-blue-200/60 animate-pulse">
               Memuat riwayat...
             </span>
           </div>
         ) : sessions.length === 0 ? (
           <div className="text-center py-8">
-            <MessageSquare className="w-6 h-6 text-on-surface-variant opacity-30 mx-auto mb-2" />
-            <span className="font-body-sm text-body-sm text-on-surface-variant opacity-50">
+            <MessageSquare className="w-6 h-6 text-blue-300/40 mx-auto mb-2" />
+            <span className="text-xs text-blue-200/50">
               Belum ada percakapan
             </span>
           </div>
@@ -115,55 +142,131 @@ export function UserSideNavBar({ onNewChat }: UserSideNavBarProps) {
           sessions.map((session) => {
             const isActive = session.session_id === activeSessionId;
             return (
-              <div
+              <motion.div
                 key={session.id}
-                onClick={() => router.push(`/?session=${session.session_id}`)}
-                className={`w-full text-left flex items-center justify-between pl-4 pr-2 py-2.5 rounded transition-colors duration-200 group cursor-pointer
+                whileHover={{ x: 2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleSessionClick(session.session_id)}
+                className={`w-full text-left flex items-center justify-between pl-3 pr-2 py-2 rounded-lg transition-all group cursor-pointer
                   ${isActive
-                    ? "text-secondary font-bold border-l-2 border-secondary bg-surface-container-highest"
-                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
+                    ? "bg-blue-800/80 text-white font-semibold border-l-4 border-[#F2C300]"
+                    : "text-blue-100 hover:bg-blue-800/40 hover:text-white"
                   }
                 `}
               >
-                <span className="font-body-sm text-body-sm truncate flex-1 mr-2">
+                <span className="text-sm truncate flex-1 mr-2">
                   {session.title || "Untitled"}
                 </span>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={(e) => handleDeleteSession(e, session.session_id)}
-                  className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-error transition-opacity p-1 cursor-pointer"
+                  className="opacity-0 group-hover:opacity-100 hover:text-red-300 hover:bg-red-500/20 text-blue-200 h-7 w-7 rounded-md transition-all cursor-pointer shrink-0"
                   title="Hapus sesi"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                </Button>
+              </motion.div>
             );
           })
         )}
       </div>
 
       {/* User Profile & Logout */}
-      <div className="mt-auto pt-4 border-t border-outline-variant">
-        <div className="flex items-center gap-3 pl-4 py-2 mb-2">
-          <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center border border-outline-variant">
-            <User className="w-4 h-4 text-on-surface-variant" />
-          </div>
+      <div className="mt-auto pt-4 border-t border-blue-700/50">
+        <div className="flex items-center gap-3 px-3 py-3 mx-1 rounded-xl bg-blue-800/50 border border-blue-700/40 text-white">
+          <Avatar className="w-9 h-9 border border-blue-700 shadow-sm bg-blue-900/50">
+            <AvatarFallback className="bg-blue-900 text-blue-100">
+              <User className="w-4 h-4" />
+            </AvatarFallback>
+          </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-body-sm text-body-sm text-on-surface truncate">
+            <p className="text-sm text-white truncate font-semibold">
               {user?.full_name || "User"}
             </p>
-            <p className="font-data-mono text-[10px] text-on-surface-variant truncate uppercase">
+            <p className="font-mono text-[10px] text-blue-200 truncate uppercase tracking-wider">
               {user?.role || "user"}
             </p>
           </div>
+          <Button 
+            variant="ghost"
+            size="icon"
+            onClick={logout}
+            className="text-blue-200 hover:text-red-300 hover:bg-red-500/20 rounded-lg shrink-0 h-8 w-8"
+            title="Logout"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
         </div>
-        <button
-          onClick={logout}
-          className="w-full bg-secondary hover:bg-secondary/90 text-on-secondary font-data-label text-data-label uppercase tracking-widest py-3 px-4 rounded flex items-center justify-center transition-colors shadow-glow"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="font-body-sm text-body-sm">Logout</span>
-        </button>
       </div>
     </nav>
+  );
+
+  return (
+    <>
+      {/* Hamburger button — mobile only */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onToggleSidebar?.(!isSidebarOpen)}
+        className="fixed top-4 left-4 z-30 md:hidden bg-[#0077ff] text-white hover:bg-blue-700 shadow-lg h-10 w-10"
+      >
+        <Menu className="w-5 h-5" />
+      </Button>
+
+      {/* Desktop sidebar — always visible */}
+      <div className="hidden md:flex fixed left-0 top-0 h-full w-[280px] bg-[#0077ff] border-r border-blue-700/30 z-20 shadow-md flex-col">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar — overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => onToggleSidebar?.(false)}
+              className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            />
+            <motion.div
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="fixed left-0 top-0 h-full w-[280px] bg-[#0077ff] z-40 md:hidden shadow-2xl flex flex-col"
+            >
+              {sidebarContent}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={sessionToDelete !== null} onOpenChange={(open) => !open && setSessionToDelete(null)}>
+        <DialogContent className="sm:max-w-[400px] bg-[#e6f0fa] shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-bold text-lg">Hapus Riwayat Chat</DialogTitle>
+            <DialogDescription className="text-slate-600 mt-2">
+              Apakah Anda yakin ingin menghapus riwayat percakapan ini secara permanen? Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-2">
+            <DialogClose render={
+              <Button variant="outline" className="border-[#0077ff]/30 hover:bg-[#0077ff]/10 hover:text-[#0077ff] text-slate-750 font-semibold">
+                Batal
+              </Button>
+            } />
+            <Button 
+              onClick={confirmDeleteSession}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold"
+            >
+              Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

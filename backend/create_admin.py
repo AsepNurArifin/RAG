@@ -1,9 +1,11 @@
 import asyncio
 from app.core.auth import hash_password
-from app.core.supabase_client import get_supabase_client
+import os
+from supabase import create_client
+from app.core.config import settings
 
 async def main():
-    client = get_supabase_client()
+    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
     email = "admin@perusahaan.com"
     password = "Admin123!"
     

@@ -11,7 +11,7 @@ Endpoints:
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from pydantic import BaseModel, EmailStr
 
 from app.core.auth import (
@@ -20,6 +20,7 @@ from app.core.auth import (
     verify_password,
 )
 from app.core.supabase_client import get_supabase_client
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class UserProfile(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(body: LoginRequest):
+async def login(body: LoginRequest, response: Response):
     """
     Login dengan email dan password.
 
@@ -102,10 +103,24 @@ async def login(body: LoginRequest):
 
     # Buat JWT token
     token = create_access_token(
-        data={"sub": user["id"], "role": user["role"]}
+        data={
+            "sub": user["id"],
+            "role": user["role"],
+            "token_version": user.get("token_version", 1)
+        }
     )
 
     logger.info("Login berhasil: email=%s, role=%s", user["email"], user["role"])
+
+    # Set token in HTTPOnly cookie
+    response.set_cookie(
+        key="emind_token",
+        value=token,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+        max_age=settings.JWT_EXPIRE_MINUTES * 60
+    )
 
     return LoginResponse(
         access_token=token,
@@ -116,6 +131,25 @@ async def login(body: LoginRequest):
             "role": user["role"],
         },
     )
+
+@router.post("/logout")
+async def logout(response: Response, user: dict = Depends(get_current_user)):
+    """
+    Logout user dengan menghapus cookie token.
+    """
+    client = get_supabase_client()
+    
+    # Increment token_version di DB untuk membatalkan semua token yang diterbitkan sebelumnya
+    current_version = user.get("token_version", 1)
+    client.table("users").update({"token_version": current_version + 1}).eq("id", user["id"]).execute()
+
+    response.delete_cookie(
+        key="emind_token",
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
+    return {"message": "Berhasil logout."}
 
 
 @router.get("/me")

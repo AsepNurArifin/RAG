@@ -26,8 +26,8 @@ function ChatContent() {
 
 export default function Home() {
   return (
-    <main className="p-margin min-h-screen w-full">
-      <div className="max-w-6xl mx-auto">
+    <main className="w-full h-full">
+      <div className="max-w-6xl mx-auto h-full">
         <Suspense fallback={<div className="text-center opacity-50 p-20">Memuat...</div>}>
           <ChatContent />
         </Suspense>

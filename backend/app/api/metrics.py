@@ -10,8 +10,9 @@ Endpoints:
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.auth import require_admin
 from app.core.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/api", tags=["Metrics"])
 
 
 @router.get("/metrics")
-async def get_dashboard_metrics() -> dict:
+async def get_dashboard_metrics(admin: dict = Depends(require_admin)) -> dict:
     """
     Hitung dan kembalikan metrik dashboard utama.
     """
@@ -30,7 +31,7 @@ async def get_dashboard_metrics() -> dict:
         # Ambil data dari query_logs
         # (Dalam skala besar, query agregasi SQL langsung lebih baik via RPC,
         # tapi untuk MVP kita tarik dan proses di Python)
-        result = client.table("query_logs").select("*").execute()
+        result = client.table("query_logs").select("*").order("created_at", desc=True).limit(1000).execute()
         logs = result.data
 
         if not logs:
@@ -51,6 +52,14 @@ async def get_dashboard_metrics() -> dict:
         reflections = sum(1 for log in logs if (log.get("reflection_count") or 0) > 0)
         reflection_rate = (reflections / total_queries) * 100
 
+        # Ambil 10 log terakhir
+        recent_result = client.table("query_logs").select("*").order("created_at", desc=True).limit(10).execute()
+        recent_logs = recent_result.data or []
+
+        # Ambil jumlah dokumen
+        docs_result = client.table("documents").select("id", count="exact").execute()
+        total_documents = docs_result.count if hasattr(docs_result, "count") else len(docs_result.data or [])
+
         return {
             "total_queries": total_queries,
             "avg_latency_ms": int(total_latency / total_queries),
@@ -58,6 +67,8 @@ async def get_dashboard_metrics() -> dict:
             "total_estimated_cost_usd": round(total_cost, 4),
             "reflection_rate_percentage": round(reflection_rate, 1),
             "intent_distribution": intents,
+            "total_documents": total_documents,
+            "recent_logs": recent_logs,
         }
 
     except Exception as e:
@@ -73,4 +84,6 @@ def _empty_metrics() -> dict:
         "total_estimated_cost_usd": 0.0,
         "reflection_rate_percentage": 0.0,
         "intent_distribution": {},
+        "total_documents": 0,
+        "recent_logs": [],
     }

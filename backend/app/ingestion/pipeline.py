@@ -21,6 +21,7 @@ import logging
 import time
 import asyncio
 
+from app.core.config import settings
 from app.db import create_document, update_document_status
 from app.ingestion.chunker import chunk_document
 from app.ingestion.embedder import embed_and_store
@@ -81,9 +82,12 @@ async def run_ingestion_pipeline(
         # 2. Update status: processing
         await update_document_status(document_id, "processing")
 
-        # 3. Extract teks
+        # 3. Extract teks dengan timeout
         logger.info("[Pipeline] Step 1/3: Extracting text — %s", filename)
-        text = await asyncio.to_thread(extract_text, file_path, file_type)
+        text = await asyncio.wait_for(
+            asyncio.to_thread(extract_text, file_path, file_type),
+            timeout=settings.EXTRACTION_TIMEOUT_SECONDS,
+        )
 
         if not text.strip():
             raise ValueError(f"Dokumen '{filename}' kosong setelah ekstraksi.")
@@ -96,7 +100,11 @@ async def run_ingestion_pipeline(
             "category": category,
             "document_id": document_id,
         }
-        chunks = await asyncio.to_thread(chunk_document, text, metadata)
+        chunks = await asyncio.to_thread(
+            chunk_document, text, metadata,
+            chunk_size=settings.CHUNK_SIZE,
+            chunk_overlap=settings.CHUNK_OVERLAP,
+        )
 
         # 5. Embed dan simpan ke Chroma
         logger.info("[Pipeline] Step 3/3: Embedding & storing — %s", filename)

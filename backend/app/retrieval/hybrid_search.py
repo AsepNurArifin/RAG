@@ -9,7 +9,7 @@ hybrid (vector similarity + keyword search)"
 
 Strategi:
 1. Vector search: cari berdasarkan makna semantik (embedding similarity)
-2. Keyword search: cari berdasarkan kecocokan kata kunci (BM25-style)
+2. Keyword search: cari berdasarkan kecocokan kata kunci dengan stemming
 3. Gabungkan hasil, deduplikasi, dan urutkan berdasarkan skor gabungan
 
 Usage:
@@ -19,6 +19,7 @@ Usage:
 """
 
 import logging
+import re
 from collections import defaultdict
 
 from langchain_core.documents import Document
@@ -26,6 +27,27 @@ from langchain_core.documents import Document
 from app.retrieval.vector_store import similarity_search_with_scores
 
 logger = logging.getLogger(__name__)
+
+
+_STOP_WORDS: set[str] = {
+    "dan", "di", "ke", "dari", "yang", "ini", "itu", "dengan",
+    "untuk", "pada", "adalah", "atau", "the", "is", "in", "of",
+    "to", "and", "a", "an", "for", "on", "with", "by", "at",
+}
+
+
+def _simple_stem(word: str) -> str:
+    """Simple Indonesian/English stemmer: hapus akhiran umum."""
+    for suffix in ("nya", "kan", "an", "i", "ing", "ed", "s", "ly"):
+        if len(word) > len(suffix) + 2 and word.endswith(suffix):
+            return word[:-len(suffix)]
+    return word
+
+
+def _tokenize(text: str) -> set[str]:
+    """Tokenisasi dengan lowercase, stemming, dan stop word removal."""
+    words = re.findall(r"\w+", text.lower())
+    return {_simple_stem(w) for w in words if w not in _STOP_WORDS and len(w) > 1}
 
 
 def hybrid_search(
@@ -71,18 +93,20 @@ def hybrid_search(
         filter_metadata=filter_metadata,
     )
 
-    # 2. Keyword matching (simple token overlap — bisa di-upgrade ke BM25 nanti)
-    query_tokens = set(query.lower().split())
+    # 2. Keyword matching dengan stemming + stop word removal
+    query_tokens = _tokenize(query)
 
     # 3. Scoring gabungan
     scored_results: dict[str, dict] = {}
 
     for doc, vector_distance in vector_results:
-        # Chroma distance: lower = lebih mirip → konversi ke skor (higher = better)
-        vector_score = max(0, 1 - vector_distance)
+        # Chroma default distance = L2 (Euclidean), bisa > 1
+        # Konversi ke skor 0-1: semakin kecil distance, semakin tinggi skor
+        # Gunakan formula 1/(1+d) yang bekerja untuk semua distance metric
+        vector_score = 1.0 / (1.0 + vector_distance)
 
         # Keyword overlap score
-        doc_tokens = set(doc.page_content.lower().split())
+        doc_tokens = _tokenize(doc.page_content)
         if doc_tokens:
             keyword_score = len(query_tokens & doc_tokens) / max(
                 len(query_tokens), 1

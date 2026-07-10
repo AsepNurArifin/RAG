@@ -1,13 +1,11 @@
 """
-Researcher Agent — EnterpriseMind AI.
+Retriever Node — EnterpriseMind AI.
 
 Melakukan hybrid retrieval (vector + keyword) dari knowledge base
 untuk mengumpulkan dokumen relevan terhadap query pengguna.
 
-Ref: FR2.3 di SRS_PRD.md, PROMPT_LIBRARY.md Researcher v1
-Model: FAST (gpt-oss-20b) — task ringan
-
-PENTING: Agent ini HANYA mengambil dokumen relevan.
+Ref: FR2.3 di SRS_PRD.md
+PENTING: Node ini HANYA mengambil dokumen relevan.
 TIDAK membuat kesimpulan/jawaban akhir (itu tugas Summarizer).
 
 Usage:
@@ -23,7 +21,7 @@ from app.retrieval.hybrid_search import hybrid_search
 logger = logging.getLogger(__name__)
 
 
-def run_researcher_agent(state: GraphState) -> GraphState:
+def run_retriever_agent(state: GraphState) -> GraphState:
     """
     Lakukan hybrid retrieval terhadap knowledge base.
 
@@ -43,13 +41,13 @@ def run_researcher_agent(state: GraphState) -> GraphState:
     reflection_count = state.get("reflection_count", 0)
 
     logger.info(
-        "[Researcher] Retrieval dimulai: query='%s...' (reflection #%d)",
+        "[Retriever] Retrieval dimulai: query='%s...' (reflection #%d)",
         query[:80],
         reflection_count,
     )
 
     callbacks = get_callbacks(
-        trace_name="researcher_agent",
+        trace_name="retriever_node",
         session_id=session_id,
     )
 
@@ -58,23 +56,23 @@ def run_researcher_agent(state: GraphState) -> GraphState:
 
         if not results:
             logger.warning(
-                "[Researcher] Tidak ditemukan dokumen relevan untuk: '%s...'",
+                "[Retriever] Tidak ditemukan dokumen relevan untuk: '%s...'",
                 query[:80],
             )
             results = []
 
         logger.info(
-            "[Researcher] Ditemukan %d dokumen relevan. "
+            "[Retriever] Ditemukan %d dokumen relevan. "
             "Top relevance: %.4f",
             len(results),
             results[0]["relevance_score"] if results else 0,
         )
 
     except Exception as e:
-        logger.exception("[Researcher] Error saat retrieval: %s", e)
+        logger.exception("[Retriever] Error saat retrieval: %s", e)
         results = []
 
-    _trace_researcher_to_langfuse(
+    _trace_retriever_to_langfuse(
         callbacks=callbacks,
         query=query,
         doc_count=len(results),
@@ -87,16 +85,16 @@ def run_researcher_agent(state: GraphState) -> GraphState:
     }
 
 
-def _trace_researcher_to_langfuse(
+def _trace_retriever_to_langfuse(
     callbacks: list,
     query: str,
     doc_count: int,
     top_score: float,
 ):
     """
-    Kirim trace manual Researcher ke LangFuse.
+    Kirim trace manual Retriever ke LangFuse.
 
-    Karena Researcher tidak memanggil LLM (hanya query Chroma),
+    Karena Retriever tidak memanggil LLM (hanya query Chroma),
     trace harus dikirim manual via LangFuse SDK.
     """
     try:
@@ -113,7 +111,7 @@ def _trace_researcher_to_langfuse(
             host=settings.LANGFUSE_HOST,
         )
 
-        trace = langfuse.trace(name="researcher_retrieval")
+        trace = langfuse.trace(name="retriever_retrieval")
         span = trace.span(
             name="hybrid_search",
             input={"query": query[:200]},
@@ -126,12 +124,12 @@ def _trace_researcher_to_langfuse(
         langfuse.flush()
 
         logger.debug(
-            "[Researcher] Trace dikirim ke LangFuse: %d docs, score=%.4f",
+            "[Retriever] Trace dikirim ke LangFuse: %d docs, score=%.4f",
             doc_count,
             top_score,
         )
 
     except Exception as e:
         logger.debug(
-            "[Researcher] Gagal trace ke LangFuse (non-critical): %s", e
+            "[Retriever] Gagal trace ke LangFuse (non-critical): %s", e
         )

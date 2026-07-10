@@ -17,6 +17,7 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.agents import SUMMARIZER_PROMPT
+from app.agents.utils import format_conversation_history, format_documents_for_prompt
 from app.core.config import settings
 from app.core.llm_provider import get_llm
 from app.core.observability import get_callbacks
@@ -47,6 +48,7 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
     flagged_issues = state.get("flagged_issues", [])
     intent = state.get("intent", "informational")
     session_id = state.get("session_id", "")
+    conversation_history = state.get("conversation_history", [])
 
     logger.info(
         "[Summarizer] Menyusun jawaban: confidence=%.2f, docs=%d",
@@ -78,33 +80,34 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
             "citations": [],
         }
 
-    # Build prompt
-    confidence_note = ""
-    if confidence < settings.CONFIDENCE_THRESHOLD:
-        confidence_note = (
-            "\n\nPERINGATAN: Confidence score rendah ({:.2f}). "
-            "Sampaikan jawaban dengan disclaimer kejujuran bahwa "
-            "informasi mungkin tidak lengkap.".format(confidence)
-        )
+    # Jika confidence terlalu rendah, beri pesan yang jelas
+    if confidence < 0.1:
+        return {
+            **state,
+            "final_answer": (
+                "Berdasarkan pencarian yang dilakukan, saya tidak menemukan "
+                "informasi yang cukup relevan untuk menjawab pertanyaan Anda "
+                "tentang ini. Kemungkinan dokumen terkait belum tersedia di "
+                "dalam knowledge base. Silakan coba dengan pertanyaan yang "
+                "lebih spesifik atau hubungi admin untuk menambah dokumen."
+            ),
+            "citations": [],
+        }
 
-    issues_note = ""
-    if flagged_issues:
-        issues_note = (
-            "\n\nMasalah yang ditandai Verifier:\n"
-            + "\n".join(f"- {issue}" for issue in flagged_issues)
-        )
+    # Format conversation history untuk konteks multi-turn
+    history_text = format_conversation_history(conversation_history)
 
+    # Build prompt — TANPA confidence_note dan issues_note
+    # untuk mencegah leakage informasi internal ke jawaban
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", SUMMARIZER_PROMPT),
             (
                 "human",
+                "{history_text}"
                 "Query pengguna: {query}\n\n"
                 "Dokumen sumber:\n{documents}\n\n"
                 "Klaim terverifikasi:\n{verified_claims}\n\n"
-                "Confidence score: {confidence}"
-                "{confidence_note}"
-                "{issues_note}\n\n"
                 "Susun jawaban akhir dengan sitasi. Respond dalam format:\n"
                 "JAWABAN:\n[jawaban naratif dengan sitasi inline]\n\n"
                 "SITASI:\n[daftar sumber yang dirujuk]",
@@ -112,27 +115,43 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
         ]
     )
 
-    llm = get_llm("reasoning")
+    llm = get_llm("reasoning", temperature=0.4)
     callbacks = get_callbacks(
         trace_name="summarizer_agent",
         session_id=session_id,
     )
 
     chain = prompt | llm
-    response = chain.invoke(
-        {
-            "query": query,
-            "documents": _format_documents(documents),
-            "verified_claims": json.dumps(verified_claims, ensure_ascii=False),
-            "confidence": f"{confidence:.2f}",
-            "confidence_note": confidence_note,
-            "issues_note": issues_note,
-        },
-        config={"callbacks": callbacks},
-    )
+    try:
+        response = chain.invoke(
+            {
+                "history_text": f"Riwayat percakapan sebelumnya:\n{history_text}\n\n" if history_text else "",
+                "query": query,
+                "documents": format_documents_for_prompt(documents, include_date=False),
+                "verified_claims": json.dumps(verified_claims, ensure_ascii=False),
+            },
+            config={"callbacks": callbacks},
+        )
+        # Parse jawaban dan sitasi
+        answer, citations = _parse_summarizer_response(response.content, documents)
 
-    # Parse jawaban dan sitasi
-    answer, citations = _parse_summarizer_response(response.content, documents)
+        # Fallback jika jawaban kosong
+        if not answer or not answer.strip():
+            answer = (
+                "Maaf, saya tidak dapat menyusun jawaban yang memadai dari "
+                "dokumen yang tersedia. Silakan coba pertanyaan yang lebih "
+                "spesifik atau hubungi admin untuk memastikan dokumen terkait "
+                "sudah diindeks dalam sistem."
+            )
+            citations = []
+    except Exception as e:
+        logger.exception("Summarizer gagal menyusun jawaban")
+        return {
+            **state,
+            "final_answer": "Maaf, terjadi kesalahan internal saat menyusun jawaban. Silakan coba beberapa saat lagi.",
+            "citations": [],
+            "error": str(e),
+        }
 
     logger.info(
         "[Summarizer] Jawaban disusun: %d karakter, %d sitasi",
@@ -140,24 +159,19 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
         len(citations),
     )
 
+    # Final safety check — jangan pernah kembalikan jawaban kosong
+    if not answer or not answer.strip():
+        answer = (
+            "Maaf, terjadi kesalahan dalam menyusun jawaban. "
+            "Silakan coba lagi dengan pertanyaan yang berbeda."
+        )
+        citations = []
+
     return {
         **state,
         "final_answer": answer,
         "citations": citations,
     }
-
-
-def _format_documents(documents: list[dict]) -> str:
-    """Format dokumen untuk prompt context."""
-    lines = []
-    for i, doc in enumerate(documents, 1):
-        source = doc.get("source", "unknown")
-        date = doc.get("date", "N/A")
-        content = doc.get("content", "")[:500]
-        lines.append(
-            f"[Sumber {i}: {source}, tanggal: {date}]\n{content}\n"
-        )
-    return "\n".join(lines)
 
 
 def _parse_summarizer_response(
@@ -167,15 +181,14 @@ def _parse_summarizer_response(
     """
     Parse response Summarizer menjadi jawaban dan daftar sitasi.
 
-    Sitasi SELALU dibangun dari source_documents asli (yang memiliki
-    metadata lengkap dari Chroma), bukan dari teks parsing LLM.
+    Hanya dokumen yang benar-benar dikutip LLM dalam teks jawaban
+    yang masuk ke citations list (berdasarkan kemunculan nama sumber).
 
     Returns:
         Tuple (answer_text, citations_list)
     """
     text = response_text.strip()
 
-    # Pisahkan JAWABAN dan SITASI dari response LLM
     answer = text
 
     if "SITASI:" in text:
@@ -184,17 +197,36 @@ def _parse_summarizer_response(
     elif "JAWABAN:" in text:
         answer = text.replace("JAWABAN:", "").strip()
 
-    # Selalu bangun sitasi dari source_documents asli (metadata lengkap)
+    # Hanya sertakan dokumen yang namanya muncul di teks jawaban
     citations = []
     if source_documents:
-        citations = [
-            {
-                "source": doc.get("source", doc.get("filename", "unknown")),
-                "date": doc.get("date", doc.get("upload_date", "N/A")) or "N/A",
-                "excerpt": doc.get("content", "")[:200],
-                "relevance_score": doc.get("relevance_score", 0),
-            }
-            for doc in source_documents[:5]
-        ]
+        answer_lower = answer.lower()
+        for doc in source_documents[:5]:
+            source_name = doc.get("source", doc.get("filename", "unknown"))
+            if source_name.lower() in answer_lower:
+                citations.append({
+                    "source": source_name,
+                    "date": doc.get("date", doc.get("upload_date", "N/A")) or "N/A",
+                    "excerpt": doc.get("content", "")[:200],
+                    "relevance_score": doc.get("relevance_score", 0),
+                })
+
+        # Fallback: jika tidak ada yang dikutip eksplisit,
+        # sertakan top-2 dokumen paling relevan
+        if not citations and source_documents:
+            sorted_docs = sorted(
+                source_documents,
+                key=lambda d: d.get("relevance_score", 0),
+                reverse=True,
+            )
+            citations = [
+                {
+                    "source": doc.get("source", doc.get("filename", "unknown")),
+                    "date": doc.get("date", doc.get("upload_date", "N/A")) or "N/A",
+                    "excerpt": doc.get("content", "")[:200],
+                    "relevance_score": doc.get("relevance_score", 0),
+                }
+                for doc in sorted_docs[:2]
+            ]
 
     return answer, citations

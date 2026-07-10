@@ -37,21 +37,21 @@ def calculate(expression: str) -> str:
     """
     logger.info("Menghitung ekspresi: %s", expression)
     
-    def _eval(node):
-        if isinstance(node, ast.Num):  # Angka statis (python < 3.8)
-            return node.n
-        elif isinstance(node, ast.Constant):  # Angka statis (python >= 3.8)
+    def _eval(node, depth=0):
+        if depth > 100:
+            raise RecursionError("Expression terlalu kompleks")
+        if isinstance(node, ast.Constant):
             return node.value
-        elif isinstance(node, ast.BinOp):  # Operasi binary (a + b)
-            return _ALLOWED_OPERATORS[type(node.op)](_eval(node.left), _eval(node.right))
-        elif isinstance(node, ast.UnaryOp):  # Unary op (-a)
-            return _ALLOWED_OPERATORS[type(node.op)](_eval(node.operand))
+        elif isinstance(node, ast.BinOp):
+            return _ALLOWED_OPERATORS[type(node.op)](_eval(node.left, depth + 1), _eval(node.right, depth + 1))
+        elif isinstance(node, ast.UnaryOp):
+            return _ALLOWED_OPERATORS[type(node.op)](_eval(node.operand, depth + 1))
         else:
             raise TypeError(node)
 
     try:
         # Parse ekspresi jadi AST, lalu evaluasi node per node (menghindari eval() yang berbahaya)
-        tree = ast.parse(expression, mode='eval').body
+        tree = ast.parse(expression.strip()[:500], mode='eval').body
         result = _eval(tree)
         
         # Return format dengan presisi wajar

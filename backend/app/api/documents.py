@@ -12,8 +12,9 @@ Endpoints:
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.auth import get_current_user
 from app.db import delete_document, get_all_documents
 from app.ingestion.embedder import delete_document_chunks
 
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/api", tags=["Documents"])
 
 
 @router.get("/documents")
-async def list_documents() -> list[dict]:
+async def list_documents(user: dict = Depends(get_current_user)) -> list[dict]:
     """
     Ambil semua dokumen beserta metadata.
     """
@@ -36,7 +37,11 @@ async def list_documents() -> list[dict]:
 
 
 @router.delete("/documents/{document_id}")
-async def remove_document(document_id: str, filename: str) -> dict:
+async def remove_document(
+    document_id: str,
+    filename: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
     """
     Hapus dokumen dari Supabase dan Chroma.
 

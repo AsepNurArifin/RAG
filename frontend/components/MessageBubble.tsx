@@ -2,7 +2,14 @@
 
 import { Message } from "../types";
 import { CitationCard } from "./CitationCard";
-import { User, ShieldCheck, Zap, RefreshCw } from "lucide-react";
+import { User, ShieldCheck, Zap, Bot } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 
 interface MessageBubbleProps {
   message: Message;
@@ -10,20 +17,33 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (isUser) {
     return (
-      <div className="w-full flex justify-end">
-        <div className="bg-surface-container-highest border border-outline-variant rounded p-6 max-w-[80%] relative before:content-[''] before:absolute before:right-[-8px] before:top-6 before:w-0 before:h-0 before:border-y-8 before:border-y-transparent before:border-l-8 before:border-l-outline-variant">
-          <div className="flex items-center gap-2 mb-2">
-            <User className="w-4 h-4 text-primary" />
-            <span className="font-data-label text-data-label text-primary uppercase tracking-widest">Operator Input</span>
+      <motion.div 
+        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.3 }}
+        className="w-full flex justify-end mb-6"
+      >
+        <div className="flex gap-4 max-w-[80%] items-start flex-row-reverse">
+          <Avatar className="w-10 h-10 border border-slate-200 shadow-sm mt-1">
+            <AvatarFallback className="bg-slate-100 text-slate-600">
+              <User className="w-5 h-5" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="bg-slate-900 text-white rounded-2xl rounded-tr-sm p-4 px-5 shadow-sm">
+            <p className="text-sm font-medium leading-relaxed">
+              {message.content}
+            </p>
           </div>
-          <p className="font-data-mono text-data-mono text-on-surface">
-            {message.content}
-          </p>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -31,79 +51,121 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const confidenceScore = message.confidenceScore !== undefined ? Math.round(message.confidenceScore * 100) : 98;
   const radius = 20;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (confidenceScore / 100) * circumference;
+  const strokeDashoffset = mounted ? circumference - (confidenceScore / 100) * circumference : circumference;
 
   return (
-    <div className="w-full space-y-4">
-      {/* AI Answer Area */}
-      <section className="bg-surface-container border border-outline-variant rounded p-8 relative">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h2 className="font-h3 text-h3 text-on-surface mb-1">Synthesized Findings</h2>
-            <p className="font-data-label text-data-label text-secondary uppercase tracking-widest flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-secondary animate-pulse" /> 
-              STATUS: VERIFICATION COMPLETE
-            </p>
-          </div>
-          
-          {/* Confidence Dial */}
-          <div className="flex flex-col items-center">
-            <div className="relative w-12 h-12">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 48 48">
-                {/* Background Circle */}
-                <circle 
-                  className="text-surface-container-highest" 
-                  cx="24" cy="24" r={radius} 
-                  fill="none" stroke="currentColor" strokeWidth="4" 
-                />
-                {/* Progress Circle */}
-                <circle 
-                  className="text-primary-container dial-circle" 
-                  cx="24" cy="24" r={radius} 
-                  fill="none" stroke="currentColor" strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center font-data-mono text-data-label text-on-surface">
-                {confidenceScore}%
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="w-full mb-8"
+    >
+      <div className="flex gap-4 max-w-[90%] items-start">
+        <Avatar className="w-10 h-10 border border-[#0077ff]/20 shadow-sm mt-1">
+          <AvatarFallback className="bg-[#0077ff] text-white">
+            <Bot className="w-5 h-5" />
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="flex-1 space-y-4">
+          {/* AI Answer Area */}
+          <Card className="border-slate-200 shadow-sm overflow-hidden bg-[#e6f0fa]">
+            <div className="bg-slate-50 border-b border-slate-100 px-6 py-3 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Verified Response
+                </span>
+              </div>
+              
+              {/* Confidence Dial */}
+              <div className="flex items-center gap-2" title="Confidence Score">
+                <div className="relative w-6 h-6">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 48 48">
+                    <circle 
+                      className="text-slate-200" 
+                      cx="24" cy="24" r={radius} 
+                      fill="none" stroke="currentColor" strokeWidth="6" 
+                    />
+                    <circle 
+                      className="text-[#0077ff] transition-all duration-1000 ease-out" 
+                      cx="24" cy="24" r={radius} 
+                      fill="none" stroke="currentColor" strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                    />
+                  </svg>
+                </div>
+                <span className="text-xs font-bold text-slate-700">{confidenceScore}%</span>
               </div>
             </div>
-            <span className="font-data-label text-[10px] text-outline-variant mt-1 uppercase">Confidence Level</span>
-          </div>
-        </div>
 
-        <div className="font-body-md text-body-md text-on-surface-variant leading-relaxed space-y-4">
-          {message.content.split("\n\n").map((para, i) => (
-            <p key={i}>{para}</p>
-          ))}
-          
-          {/* Action Items Box (if any action items exist) */}
-          {message.actionItems && message.actionItems.length > 0 && (
-            <div className="mt-4 p-4 bg-surface-container-lowest border-l-2 border-secondary font-data-mono text-data-mono text-sm">
-              <span className="text-secondary flex items-center gap-1.5"><Zap className="w-4 h-4" /> INFERENCE_ENGINE: </span> Recommended Action.<br/>
-              {message.actionItems.map((item: any, i: number) => (
-                <div key={i}>&gt; RECOMMENDATION: {item.draft_content || item.action_type}</div>
-              ))}
-            </div>
+            <CardContent className="p-4 sm:p-6">
+              <div className="text-slate-800 text-sm leading-relaxed space-y-4 prose prose-slate max-w-none prose-p:leading-relaxed prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 prose-a:text-[#0077ff] hover:prose-a:text-[#0077ff]/80">
+                <ReactMarkdown 
+                  rehypePlugins={[rehypeSanitize]}
+                  components={{
+                    a: ({node, ...props}) => {
+                      if (props.href === '#citation') {
+                        return (
+                          <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono cursor-pointer hover:bg-[#0077ff]/10 text-[#0077ff] align-super mx-0.5">
+                            {props.children}
+                          </Badge>
+                        );
+                      }
+                      return <a {...props} />
+                    }
+                  }}
+                >
+                  {message.content.replace(/\[(Sumber[^\]]*)\]/gi, "[$1](#citation)")}
+                </ReactMarkdown>
+                
+                {/* Action Items Box */}
+                {message.actionItems && message.actionItems.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    transition={{ delay: 0.5 }}
+                    className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200/50"
+                  >
+                    <div className="flex items-center gap-2 text-amber-700 font-semibold text-xs uppercase tracking-wide mb-2">
+                      <Zap className="w-4 h-4" /> Recommended Action
+                    </div>
+                    <ul className="space-y-2 text-sm text-slate-700">
+                      {message.actionItems.map((item: any, i: number) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-amber-500 font-bold">&gt;</span>
+                          <span>{item.draft_content || item.action_type}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </motion.div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Citations Section */}
+          {message.citations && message.citations.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="mt-4"
+            >
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3 pl-2">
+                Sources & Citations
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {message.citations.map((citation, index) => (
+                  <CitationCard key={index} citation={citation} index={index} />
+                ))}
+              </div>
+            </motion.div>
           )}
         </div>
-      </section>
-
-      {/* Citations Section */}
-      {message.citations && message.citations.length > 0 && (
-        <section className="space-y-4 mt-8">
-          <h3 className="font-data-label text-data-label text-on-surface-variant uppercase tracking-widest border-b border-outline-variant pb-2">
-            Audit Citations & Source Data
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-            {message.citations.map((citation, index) => (
-              <CitationCard key={index} citation={citation} index={index} />
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
+      </div>
+    </motion.div>
   );
 }

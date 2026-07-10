@@ -9,7 +9,18 @@ export function useChatStream(initialSessionId?: string) {
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const { setActiveAgent } = useActiveAgent();
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Auto-scroll to bottom when messages change
   const scrollToBottom = () => {
@@ -20,37 +31,25 @@ export function useChatStream(initialSessionId?: string) {
     scrollToBottom();
   }, [messages]);
 
-  // Agent cycling simulation while querying
+  // Agent cycling simulation while querying (REMOVED)
   useEffect(() => {
     if (!isLoading) {
       setActiveAgent("idle");
-      return;
     }
-
-    setActiveAgent("orchestrator");
-    const t1 = setTimeout(() => setActiveAgent("researcher"), 1000);
-    const t2 = setTimeout(() => setActiveAgent("verifier"), 3000);
-    const t3 = setTimeout(() => setActiveAgent("summarizer"), 5500);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
   }, [isLoading, setActiveAgent]);
 
   // Load history for a given session
   const loadSessionHistory = useCallback(async (sid: string) => {
     try {
       const data = await api.getSessionMessages(sid);
-      const loaded: Message[] = data.map((msg: any, i: number) => ({
-        id: msg.id || `hist-${i}`,
-        role: msg.role,
-        content: msg.content,
-        citations: msg.citations || [],
-        actionItems: msg.action_items || [],
-        confidenceScore: msg.confidence_score,
-        latencyMs: msg.latency_ms,
+      const loaded: Message[] = data.map((raw: Record<string, any>, i: number) => ({
+        id: raw.id || `hist-${i}`,
+        role: raw.role,
+        content: raw.content,
+        citations: raw.citations || [],
+        actionItems: raw.action_items || [],
+        confidenceScore: raw.confidence_score,
+        latencyMs: raw.latency_ms,
       }));
       setMessages(loaded);
       setSessionId(sid);
@@ -71,45 +70,68 @@ export function useChatStream(initialSessionId?: string) {
     
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    setActiveAgent("orchestrator");
 
-    try {
-      // Call backend API
-      const response: QueryResponse = await api.query(content, sessionId);
-      
-      // Update session ID if this is the first interaction
-      if (!sessionId && response.session_id) {
-        setSessionId(response.session_id);
-      }
-
-      // Add assistant response to UI
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: response.answer,
-        citations: response.citations,
-        actionItems: response.action_items,
-        confidenceScore: response.confidence_score,
-        intent: response.intent,
-        reflectionCount: response.reflection_count,
-        latencyMs: response.latency_ms,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      
-      // Add error message to UI
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "system",
-        content: error instanceof Error ? error.message : "Terjadi kesalahan sistem. Silakan coba lagi.",
-      };
-      
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+    // Cancel previous request if still running
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  }, [sessionId, isLoading]);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    api.queryStream(
+      content,
+      sessionId,
+      (agent) => {
+        // Map LangGraph node names to our UI active agent states
+        if (agent.includes("orchestrator")) setActiveAgent("orchestrator");
+        else if (agent.includes("researcher")) setActiveAgent("researcher");
+        else if (agent.includes("verifier")) setActiveAgent("verifier");
+        else if (agent.includes("summarizer")) setActiveAgent("summarizer");
+        else if (agent.includes("executor")) setActiveAgent("executor");
+      },
+      (response: QueryResponse) => {
+        // Update session ID if this is the first interaction
+        if (!sessionId && response.session_id) {
+          setSessionId(response.session_id);
+        }
+
+        // Add assistant response to UI
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: response.answer,
+          citations: response.citations,
+          actionItems: response.action_items,
+          confidenceScore: response.confidence_score,
+          intent: response.intent,
+          reflectionCount: response.reflection_count,
+          latencyMs: response.latency_ms,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+        setIsLoading(false);
+      },
+      (error: Error) => {
+        if (error.name === "AbortError") {
+          console.log("Stream query cancelled.");
+          return;
+        }
+        console.error("Error sending message:", error);
+        
+        // Add error message to UI
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "system",
+          content: error.message || "Terjadi kesalahan sistem. Silakan coba lagi.",
+        };
+        
+        setMessages((prev) => [...prev, errorMessage]);
+        setIsLoading(false);
+      },
+      controller.signal
+    );
+  }, [sessionId, isLoading, setActiveAgent]);
 
   const clearChat = useCallback(() => {
     setMessages([]);

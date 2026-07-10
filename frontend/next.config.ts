@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Konfigurasi untuk deployment production ke Vercel
-  // NEXT_PUBLIC_API_URL di-set via environment variable Vercel
-
-  // Security headers untuk production
   async headers() {
     return [
       {
@@ -26,13 +22,30 @@ const nextConfig: NextConfig = {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
           },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' wss://* http://localhost:* http://127.0.0.1:*;",
+          },
         ],
       },
     ];
   },
 
-  // Standalone output untuk Vercel deployment
   output: "standalone",
+
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

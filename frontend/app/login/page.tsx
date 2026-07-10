@@ -3,6 +3,19 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { ShieldCheck, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { motion } from "framer-motion";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -26,108 +39,114 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full flex-1 min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        {/* Logo / Header */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-container-high border border-outline-variant mb-6">
-            <ShieldCheck className="w-8 h-8 text-secondary" />
-          </div>
-          <h1 className="font-h2 text-h2 font-semibold text-primary">
+    <div className="w-full min-h-screen flex items-center justify-center bg-gradient-to-r from-[#F2C300] via-[#FFF5D6] via-[#9CE3CC] via-[#00A6D6] to-[#0057A8] p-6 relative overflow-hidden">
+      {/* Background decoration with PT Pusri Brand Colors */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#0077ff]/10 rounded-full blur-3xl opacity-30 pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-[#F2C300]/10 rounded-full blur-3xl opacity-30 pointer-events-none" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="w-full max-w-lg z-10"
+      >
+        <div className="text-center mb-8">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[#e6f0fa] shadow-md border border-[#0077ff]/20 mb-6"
+          >
+            <ShieldCheck className="w-10 h-10 text-[#0057A8]" />
+          </motion.div>
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 drop-shadow-sm">
             EnterpriseMind AI
           </h1>
-          <p className="font-body-sm text-body-sm text-on-surface-variant mt-2">
+          <p className="text-base font-semibold text-slate-700 mt-2 bg-white/20 backdrop-blur-xs inline-block px-3 py-1 rounded-full border border-white/30">
             Internal Knowledge Assistant — Secure Login
           </p>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-8 shadow-lg">
-          <h2 className="font-h3 text-h3 text-on-surface mb-6 text-center">
-            Masuk ke Sistem
-          </h2>
+        <Card className="shadow-2xl border border-[#0077ff]/20 backdrop-blur-md bg-[#e6f0fa]/95 p-4 md:p-6 rounded-2xl">
+          <CardHeader className="pb-6">
+            <CardTitle className="text-2xl text-center text-slate-900 font-bold">Masuk ke Sistem</CardTitle>
+            <CardDescription className="text-center text-base text-slate-600 mt-1">
+              Masukkan kredensial Anda untuk melanjutkan
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                <Alert variant="destructive" className="mb-6 bg-red-50 border border-red-200 text-red-800">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  <AlertDescription className="text-sm font-medium">{error}</AlertDescription>
+                </Alert>
+              </motion.div>
+            )}
 
-          {error && (
-            <div className="flex items-center gap-2 bg-error/10 border border-error/30 text-error rounded px-4 py-3 mb-6 font-body-sm text-body-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <div>
-              <label
-                htmlFor="login-email"
-                className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-2"
-              >
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline-variant" />
-                <input
-                  id="login-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@perusahaan.com"
-                  required
-                  disabled={isSubmitting}
-                  className="w-full bg-surface-container-high border border-outline rounded py-3 pl-10 pr-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all placeholder:text-outline-variant/50 disabled:opacity-50"
-                />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="login-email" className="text-sm font-semibold text-slate-700">Email Perusahaan</Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nama@perusahaan.com"
+                    required
+                    disabled={isSubmitting}
+                    className="h-12 pl-12 pr-4 text-base bg-[#e6f0fa] border-[#0077ff]/30 focus-visible:ring-[#0077ff] text-slate-800 rounded-xl"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Password */}
-            <div>
-              <label
-                htmlFor="login-password"
-                className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-2"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline-variant" />
-                <input
-                  id="login-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  disabled={isSubmitting}
-                  className="w-full bg-surface-container-high border border-outline rounded py-3 pl-10 pr-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all placeholder:text-outline-variant/50 disabled:opacity-50"
-                />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="login-password" className="text-sm font-semibold text-slate-700">Kata Sandi</Label>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Input
+                    id="login-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    disabled={isSubmitting}
+                    className="h-12 pl-12 pr-4 text-base bg-[#e6f0fa] border-[#0077ff]/30 focus-visible:ring-[#0077ff] text-slate-800 rounded-xl"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isSubmitting || !email || !password}
-              className="w-full bg-brass text-on-primary font-body-sm text-body-sm font-semibold py-3 rounded hover:brightness-110 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Memverifikasi...
-                </>
-              ) : (
-                "Masuk"
-              )}
-            </button>
-          </form>
-
-          <p className="text-center font-body-sm text-body-sm text-on-surface-variant mt-6 opacity-60">
-            Hubungi admin jika belum memiliki akun.
-          </p>
-        </div>
-
-        {/* Footer */}
-        <p className="text-center font-data-mono text-[10px] text-on-surface-variant mt-8 opacity-40 uppercase">
-          EnterpriseMind AI v0.1.0 — Internal Use Only
-        </p>
-      </div>
+              <Button
+                type="submit"
+                className="w-full h-12 bg-[#0057A8] hover:bg-[#004790] text-white shadow-lg hover:shadow-xl transition-all mt-6 text-base font-bold rounded-xl cursor-pointer"
+                disabled={isSubmitting || !email || !password}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Memverifikasi...
+                  </>
+                ) : (
+                  "Masuk"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="flex justify-center flex-col gap-4 border-t border-slate-200/50 pt-6 mt-6">
+            <p className="text-center text-sm text-slate-600 font-medium">
+              Hubungi admin jika Anda belum memiliki akun.
+            </p>
+            <p className="text-center font-mono text-[10px] text-slate-400 uppercase tracking-widest">
+              EnterpriseMind AI v0.1.0
+            </p>
+          </CardFooter>
+        </Card>
+      </motion.div>
     </div>
   );
 }

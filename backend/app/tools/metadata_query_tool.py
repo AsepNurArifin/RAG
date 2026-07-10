@@ -23,13 +23,13 @@ def query_document_metadata(category_filter: str = None) -> list[dict]:
         category_filter: Opsional. Filter berdasarkan kategori dokumen.
 
     Returns:
-        List dari dokumen metadata (filename, category, upload_date).
+        List dari dokumen metadata (filename, category, created_at).
     """
     logger.info("Mengambil metadata dokumen, filter_kategori=%s", category_filter)
     
     try:
         client = get_supabase_client()
-        query = client.table("documents").select("filename, category, upload_date")
+        query = client.table("documents").select("filename, category, created_at")
         
         if category_filter:
             query = query.eq("category", category_filter)

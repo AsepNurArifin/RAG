@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def get_llm(
     task_type: str = "fast",
     temperature: float = 0.1,
-    max_tokens: int | None = None,
+    max_tokens: int | None = 4096,
 ) -> ChatGroq:
     """
     Buat instance ChatGroq berdasarkan tipe task.
@@ -58,6 +58,12 @@ def get_llm(
             f"Gunakan salah satu: {list(model_map.keys())}"
         )
 
+    # Validasi API Key
+    if not settings.GROQ_API_KEY or "your_" in settings.GROQ_API_KEY:
+        if not settings.GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY tidak boleh kosong")
+        raise ValueError("GROQ_API_KEY tidak valid, silakan ganti placeholder dengan key asli.")
+
     logger.info(
         "Membuat LLM instance: model=%s, task_type=%s, temperature=%s",
         model_name,
@@ -69,6 +75,8 @@ def get_llm(
         "model": model_name,
         "api_key": settings.GROQ_API_KEY,
         "temperature": temperature,
+        "max_retries": 3,
+        "timeout": 30.0,
     }
     if max_tokens is not None:
         kwargs["max_tokens"] = max_tokens

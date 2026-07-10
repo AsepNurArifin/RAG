@@ -22,7 +22,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -31,69 +31,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Check for existing token on mount
+  // Check for existing session on mount via /api/auth/me
   useEffect(() => {
-    const savedToken = localStorage.getItem("emind_token");
-    const savedUser = localStorage.getItem("emind_user");
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-
-      // Verify token is still valid
-      fetch(`${API_BASE_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${savedToken}` },
+    const storedToken = localStorage.getItem("emind_token");
+    fetch(`${API_BASE_URL}/auth/me`, {
+      headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("No session");
+        return res.json();
       })
-        .then((res) => {
-          if (!res.ok) throw new Error("Token expired");
-          return res.json();
-        })
-        .then((userData) => {
-          setUser(userData);
-          localStorage.setItem("emind_user", JSON.stringify(userData));
-        })
-        .catch(() => {
-          // Token invalid — clear and redirect
-          localStorage.removeItem("emind_token");
-          localStorage.removeItem("emind_user");
-          setToken(null);
-          setUser(null);
+      .then((userData) => {
+        setUser(userData);
+        setToken("cookie-session"); // Mock token to bypass !token checks
+      })
+      .catch(() => {
+        // No valid session
+        setToken(null);
+        setUser(null);
+        if (pathname !== "/login") {
           router.push("/login");
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-      if (pathname !== "/login") {
-        router.push("/login");
-      }
-    }
+        }
+      })
+      .finally(() => setIsLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redirect to login if not authenticated (except on /login page)
   useEffect(() => {
-    if (!isLoading) {
-      if (!token && pathname !== "/login") {
-        router.push("/login");
-      } else if (token && pathname === "/login") {
-        router.push(user?.role === "admin" ? "/admin" : "/");
-      } else if (token && user) {
-        // Jika admin mencoba mengakses halaman user (chat), log out dan paksa login
-        if (user.role === "admin" && !pathname.startsWith("/admin")) {
-          // Kita tidak bisa langsung memanggil fungsi logout() yang didefinisikan di bawah,
-          // karena fungsi logout() dibuat dengan useCallback di bawah scope ini.
-          // Jadi kita bersihkan localStorage manual dan redirect.
-          localStorage.removeItem("emind_token");
-          localStorage.removeItem("emind_user");
-          router.push("/login");
-          setTimeout(() => window.location.reload(), 100);
-        }
-        // Mencegah user biasa mengakses halaman admin
-        else if (user.role === "user" && pathname.startsWith("/admin")) {
-          router.push("/");
-        }
-      }
+    if (!isLoading && !token && pathname !== "/login") {
+      router.push("/login");
     }
-  }, [isLoading, token, pathname, router, user]);
+  }, [isLoading, token, pathname, router]);
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -104,14 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
+      console.error("[Login] Error:", response.status, error);
       throw new Error(error.detail || "Login gagal.");
     }
 
     const data = await response.json();
+    localStorage.setItem("emind_token", data.access_token);
     setToken(data.access_token);
     setUser(data.user);
-    localStorage.setItem("emind_token", data.access_token);
-    localStorage.setItem("emind_user", JSON.stringify(data.user));
 
     if (data.user.role === "admin") {
       router.push("/admin");
@@ -120,11 +88,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [router]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("emind_token") || ""}`,
+        },
+      });
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
+    localStorage.removeItem("emind_token");
     setToken(null);
     setUser(null);
-    localStorage.removeItem("emind_token");
-    localStorage.removeItem("emind_user");
     router.push("/login");
   }, [router]);
 

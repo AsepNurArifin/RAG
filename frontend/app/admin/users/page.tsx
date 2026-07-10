@@ -4,6 +4,14 @@ import { useState, useEffect } from "react";
 import { api } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
 import { UserPlus, Trash2, Edit2, Shield, User, X, Save, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
 
 interface UserData {
   id: string;
@@ -100,249 +108,354 @@ export default function UsersPage() {
 
   if (!isAdmin) {
     return (
-      <div className="p-margin min-h-screen flex items-center justify-center">
-        <p className="text-on-surface-variant">Akses ditolak. Hanya admin yang dapat mengakses halaman ini.</p>
+      <div className="p-8 min-h-screen flex items-center justify-center bg-[#F2C300]">
+        <p className="text-slate-500 font-medium">Akses ditolak. Hanya admin yang dapat mengakses halaman ini.</p>
       </div>
     );
   }
 
   return (
-    <div className="p-margin min-h-screen">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 md:px-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8"
+      >
         <div>
-          <h1 className="font-h2 text-h2 text-on-surface font-semibold">User Management</h1>
-          <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">User Management</h1>
+          <p className="text-slate-500 mt-2 text-xs sm:text-sm">
             Kelola akun pengguna sistem EnterpriseMind AI
           </p>
         </div>
-        <button
+        <Button
           onClick={() => setShowCreateModal(true)}
-          className="bg-brass text-on-primary font-body-sm text-body-sm font-semibold px-5 py-2.5 rounded hover:brightness-110 transition-all flex items-center gap-2 cursor-pointer"
+          className="bg-[#0077ff] hover:bg-[#0047b3] text-white gap-2 font-semibold shadow-sm w-full sm:w-auto"
         >
           <UserPlus className="w-4 h-4" />
           Tambah User
-        </button>
-      </div>
+        </Button>
+      </motion.div>
 
-      {/* Users Table */}
-      <div className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-outline-variant bg-surface-container-high">
-              <th className="text-left px-6 py-3 font-data-label text-data-label text-on-surface-variant uppercase tracking-widest">Nama</th>
-              <th className="text-left px-6 py-3 font-data-label text-data-label text-on-surface-variant uppercase tracking-widest">Email</th>
-              <th className="text-left px-6 py-3 font-data-label text-data-label text-on-surface-variant uppercase tracking-widest">Role</th>
-              <th className="text-left px-6 py-3 font-data-label text-data-label text-on-surface-variant uppercase tracking-widest">Status</th>
-              <th className="text-left px-6 py-3 font-data-label text-data-label text-on-surface-variant uppercase tracking-widest">Dibuat</th>
-              <th className="text-right px-6 py-3 font-data-label text-data-label text-on-surface-variant uppercase tracking-widest">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={6} className="text-center py-12 text-on-surface-variant">
-                  <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-                  Memuat data...
-                </td>
-              </tr>
-            ) : users.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center py-12 text-on-surface-variant">
-                  Belum ada user.
-                </td>
-              </tr>
-            ) : (
-              users.map((u) => (
-                <tr key={u.id} className="border-b border-outline-variant/50 hover:bg-surface-container-high transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+      {/* Users - Mobile Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="md:hidden"
+      >
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="text-center py-12 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-[#0077ff]" />
+              Memuat data pengguna...
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              Belum ada pengguna terdaftar.
+            </div>
+          ) : (
+            users.map((u) => (
+              <Card key={u.id} className="bg-[#e6f0fa] border-slate-200 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
                         {u.role === "admin" ? (
-                          <Shield className="w-4 h-4 text-brass" />
+                          <Shield className="w-5 h-5 text-[#0077ff]" />
                         ) : (
-                          <User className="w-4 h-4 text-on-surface-variant" />
+                          <User className="w-5 h-5 text-slate-500" />
                         )}
                       </div>
-                      <span className="font-body-sm text-body-sm text-on-surface">{u.full_name}</span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-950 text-sm truncate">{u.full_name}</p>
+                        <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                      </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 font-data-mono text-data-mono text-on-surface-variant">{u.email}</td>
-                  <td className="px-6 py-4">
-                    <span className={`font-data-label text-[10px] uppercase px-2 py-1 rounded ${
-                      u.role === "admin"
-                        ? "bg-brass/20 text-brass"
-                        : "bg-secondary/20 text-secondary"
-                    }`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`font-data-label text-[10px] uppercase px-2 py-1 rounded ${
-                      u.is_active
-                        ? "bg-cyan/20 text-cyan"
-                        : "bg-error/20 text-error"
-                    }`}>
-                      {u.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-data-mono text-data-mono text-on-surface-variant">
-                    {new Date(u.created_at).toLocaleDateString("id-ID")}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setEditingUser({ ...u })}
-                        className="p-2 hover:bg-surface-container-highest rounded transition-colors text-on-surface-variant hover:text-secondary cursor-pointer"
+                        className="h-8 w-8 text-slate-500 hover:text-[#0077ff] hover:bg-[#0077ff]/5 bg-transparent"
                         title="Edit"
                       >
                         <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleDeleteUser(u.id, u.email)}
-                        className="p-2 hover:bg-surface-container-highest rounded transition-colors text-on-surface-variant hover:text-error cursor-pointer"
+                        className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50 bg-transparent"
                         title="Hapus"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Badge className={`shadow-none font-medium capitalize text-xs ${
+                      u.role === "admin"
+                        ? "bg-[#0077ff]/10 text-[#0077ff] border-[#0077ff]/20 border"
+                        : "bg-slate-200/60 text-slate-700 border-slate-200 border"
+                    }`}>
+                      {u.role}
+                    </Badge>
+                    <Badge className={`shadow-none font-medium capitalize text-xs ${
+                      u.is_active
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 border"
+                        : "bg-rose-50 text-rose-800 border-rose-200 border"
+                    }`}>
+                      {u.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </motion.div>
 
-      {/* Create User Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface-container border border-outline-variant rounded-lg p-8 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-h3 text-h3 text-on-surface">Tambah User Baru</h2>
-              <button onClick={() => setShowCreateModal(false)} className="text-on-surface-variant hover:text-on-surface cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
+      {/* Users Table - Desktop */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="hidden md:block"
+      >
+        <Card className="shadow-sm border-slate-200 overflow-hidden bg-[#e6f0fa]">
+          <div className="overflow-x-auto bg-[#e6f0fa]">
+            <Table className="bg-[#e6f0fa]">
+              <TableHeader className="bg-[#0077ff]/5">
+                <TableRow className="bg-transparent hover:bg-transparent border-b border-slate-200">
+                  <TableHead className="font-semibold text-slate-700 px-4">Nama</TableHead>
+                  <TableHead className="font-semibold text-slate-700 px-4">Email</TableHead>
+                  <TableHead className="font-semibold text-slate-700 px-4">Role</TableHead>
+                  <TableHead className="font-semibold text-slate-700 px-4">Status</TableHead>
+                  <TableHead className="font-semibold text-slate-700 hidden lg:table-cell px-4">Dibuat</TableHead>
+                  <TableHead className="font-semibold text-slate-700 text-right px-4">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="bg-[#e6f0fa]">
+                {isLoading ? (
+                  <TableRow className="bg-transparent hover:bg-transparent">
+                    <TableCell colSpan={6} className="text-center py-12 text-slate-400 bg-transparent">
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-[#0077ff]" />
+                      Memuat data pengguna...
+                    </TableCell>
+                  </TableRow>
+                ) : users.length === 0 ? (
+                  <TableRow className="bg-transparent hover:bg-transparent">
+                    <TableCell colSpan={6} className="text-center py-12 text-slate-400 bg-transparent">
+                      Belum ada pengguna terdaftar.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((u) => (
+                    <TableRow key={u.id} className="bg-transparent hover:bg-[#0077ff]/5 border-b border-slate-200/60 transition-colors">
+                      <TableCell className="bg-transparent px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
+                            {u.role === "admin" ? (
+                              <Shield className="w-4 h-4 text-[#0077ff]" />
+                            ) : (
+                              <User className="w-4 h-4 text-slate-500" />
+                            )}
+                          </div>
+                          <span className="font-semibold text-slate-950">{u.full_name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-slate-600 text-sm px-4 py-3 bg-transparent">{u.email}</TableCell>
+                      <TableCell className="px-4 py-3 bg-transparent">
+                        <Badge className={`shadow-none font-medium capitalize text-xs ${
+                          u.role === "admin"
+                            ? "bg-[#0077ff]/10 text-[#0077ff] border-[#0077ff]/20 border"
+                            : "bg-slate-200/60 text-slate-700 border-slate-200 border"
+                        }`}>
+                          {u.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 bg-transparent">
+                        <Badge className={`shadow-none font-medium capitalize text-xs ${
+                          u.is_active
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200 border"
+                            : "bg-rose-50 text-rose-800 border-rose-200 border"
+                        }`}>
+                          {u.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-slate-600 text-sm hidden lg:table-cell px-4 py-3 bg-transparent">
+                        {new Date(u.created_at).toLocaleDateString("id-ID")}
+                      </TableCell>
+                      <TableCell className="text-right px-4 py-3 bg-transparent">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingUser({ ...u })}
+                            className="h-8 w-8 text-slate-500 hover:text-[#0077ff] hover:bg-[#0077ff]/5 bg-transparent"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteUser(u.id, u.email)}
+                            className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50 bg-transparent"
+                            title="Hapus"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* Create User Dialog */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="sm:max-w-[425px] bg-[#e6f0fa]">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900">Tambah User Baru</DialogTitle>
+            <DialogDescription className="text-slate-500">
+              Buat akun baru untuk memberikan akses ke EnterpriseMind AI.
+            </DialogDescription>
+          </DialogHeader>
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-lg p-3 text-sm font-medium">
+              {error}
             </div>
+          )}
 
-            {error && (
-              <div className="bg-error/10 border border-error/30 text-error rounded px-4 py-3 mb-4 font-body-sm text-body-sm">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
-                <label className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-1">Nama Lengkap</label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                  className="w-full bg-surface-container-high border border-outline rounded py-2.5 px-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
-                />
-              </div>
-              <div>
-                <label className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-1">Email</label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  required
-                  className="w-full bg-surface-container-high border border-outline rounded py-2.5 px-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
-                />
-              </div>
-              <div>
-                <label className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-1">Password</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="w-full bg-surface-container-high border border-outline rounded py-2.5 px-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
-                />
-              </div>
-              <div>
-                <label className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-1">Role</label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full bg-surface-container-high border border-outline rounded py-2.5 px-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all cursor-pointer"
-                >
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <button
+          <form onSubmit={handleCreateUser} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="text-slate-700 font-medium">Nama Lengkap</Label>
+              <Input
+                id="name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                required
+                placeholder="Super Admin"
+                className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-slate-700 font-medium">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                required
+                placeholder="admin@enterprise.com"
+                className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+                placeholder="••••••"
+                className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="role" className="text-slate-700 font-medium">Role</Label>
+              <select
+                id="role"
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                className="w-full !bg-[#e6f0fa] border border-slate-200 rounded-lg p-2 text-slate-850 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-brass text-on-primary font-body-sm text-body-sm font-semibold py-3 rounded hover:brightness-110 transition-all flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
+                className="w-full bg-[#0077ff] hover:bg-[#0047b3] text-white gap-2 font-semibold shadow-sm"
               >
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 {isSubmitting ? "Membuat..." : "Buat User"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      {/* Edit User Modal */}
-      {editingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface-container border border-outline-variant rounded-lg p-8 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-h3 text-h3 text-on-surface">Edit User</h2>
-              <button onClick={() => setEditingUser(null)} className="text-on-surface-variant hover:text-on-surface cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Edit User Dialog */}
+      <Dialog open={editingUser !== null} onOpenChange={(open) => !open && setEditingUser(null)}>
+        {editingUser && (
+          <DialogContent className="sm:max-w-[425px] bg-[#e6f0fa]">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900">Edit User</DialogTitle>
+              <DialogDescription className="text-slate-500">
+                Ubah informasi profil atau peran akun ini.
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-1">Nama Lengkap</label>
-                <input
-                  type="text"
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-name" className="text-slate-700 font-medium">Nama Lengkap</Label>
+                <Input
+                  id="edit-name"
                   value={editingUser.full_name}
                   onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
-                  className="w-full bg-surface-container-high border border-outline rounded py-2.5 px-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
+                  className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
                 />
               </div>
-              <div>
-                <label className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-1">Role</label>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-role" className="text-slate-700 font-medium">Role</Label>
                 <select
+                  id="edit-role"
                   value={editingUser.role}
                   onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                  className="w-full bg-surface-container-high border border-outline rounded py-2.5 px-4 text-on-surface font-body-sm text-body-sm focus:border-secondary focus:ring-1 focus:ring-secondary transition-all cursor-pointer"
+                  className="w-full !bg-[#e6f0fa] border border-slate-200 rounded-lg p-2 text-slate-850 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
                 >
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3.5 pt-2">
                 <input
                   type="checkbox"
                   id="edit-active"
                   checked={editingUser.is_active}
                   onChange={(e) => setEditingUser({ ...editingUser, is_active: e.target.checked })}
-                  className="cursor-pointer"
+                  className="cursor-pointer h-4 w-4 rounded border-slate-300 text-[#0077ff] focus:ring-[#0077ff]"
                 />
-                <label htmlFor="edit-active" className="font-body-sm text-body-sm text-on-surface cursor-pointer">
+                <Label htmlFor="edit-active" className="cursor-pointer font-medium text-slate-800">
                   Akun Aktif
-                </label>
+                </Label>
               </div>
-              <button
-                onClick={handleUpdateUser}
-                disabled={isSubmitting}
-                className="w-full bg-brass text-on-primary font-body-sm text-body-sm font-semibold py-3 rounded hover:brightness-110 transition-all flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
-              >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
-              </button>
+              <DialogFooter className="pt-4">
+                <Button
+                  onClick={handleUpdateUser}
+                  disabled={isSubmitting}
+                  className="w-full bg-[#0077ff] hover:bg-[#0047b3] text-white gap-2 font-semibold shadow-sm"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                </Button>
+              </DialogFooter>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

@@ -41,6 +41,10 @@ def get_langfuse_handler(
     Side effects:
         Membuat koneksi ke LangFuse server pada pemanggilan pertama.
     """
+    global _langfuse_handler
+    if _langfuse_handler is not None:
+        return _langfuse_handler
+
     if not settings.LANGFUSE_PUBLIC_KEY or not settings.LANGFUSE_SECRET_KEY:
         logger.warning(
             "LangFuse credentials belum di-set. "
@@ -52,7 +56,7 @@ def get_langfuse_handler(
     try:
         from langfuse.callback import CallbackHandler
 
-        handler = CallbackHandler(
+        _langfuse_handler = CallbackHandler(
             public_key=settings.LANGFUSE_PUBLIC_KEY,
             secret_key=settings.LANGFUSE_SECRET_KEY,
             host=settings.LANGFUSE_HOST,
@@ -65,7 +69,7 @@ def get_langfuse_handler(
             trace_name,
             settings.LANGFUSE_HOST,
         )
-        return handler
+        return _langfuse_handler
 
     except Exception:
         logger.exception("Gagal membuat LangFuse handler")

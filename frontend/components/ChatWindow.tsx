@@ -4,7 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import { useChatStream } from "../hooks/useChatStream";
 import { MessageBubble } from "./MessageBubble";
 import { LoadingIndicator } from "./LoadingIndicator";
-import { Terminal, Send } from "lucide-react";
+import { Terminal, Send, Lightbulb } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
+import { motion } from "framer-motion";
 
 interface ChatWindowProps {
   onSessionChange?: (sessionId: string | undefined) => void;
@@ -54,51 +58,68 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
   };
 
   return (
-    <div className="w-full flex flex-col space-y-8 pb-32">
+    <div className="flex flex-col h-full bg-[#e6f0fa] rounded-xl border border-slate-200 overflow-hidden shadow-sm relative">
       
-      {/* AI Answer Area (Messages List) */}
-      <div className="flex flex-col space-y-8">
-        {messages.length === 0 ? (
-          <div className="text-center opacity-70 mt-20">
-            <h3 className="font-h3 text-h3 text-on-surface mb-2">Awaiting Parameters</h3>
-            <p className="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">
-              Please enter your query below to initiate analysis across the EnterpriseMind Knowledge Vault.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 w-full max-w-lg mx-auto">
-              {["Berapa hari cuti tahunan?", "Buatkan draft email peringatan SP1", "Analisis kebijakan WFH", "Siapa CEO perusahaan?"].map((suggestion, i) => (
-                <button
-                  key={i}
-                  onClick={() => sendMessage(suggestion)}
-                  className="p-3 text-sm text-left border border-outline bg-surface-container hover:bg-surface-container-highest rounded text-on-surface/80 hover:text-on-surface transition-colors cursor-pointer"
-                >
-                  {suggestion}
-                </button>
+      {/* Scrollable Messages Area */}
+      <ScrollArea className="flex-1 min-h-0 p-6 pb-40">
+        <div className="max-w-4xl mx-auto flex flex-col gap-6">
+          {messages.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center mt-32"
+            >
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#0077ff]/10 text-[#0077ff] mb-6 shadow-sm">
+                <Lightbulb className="w-8 h-8" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-3">Apa yang ingin Anda ketahui?</h3>
+              <p className="text-slate-500 max-w-md mx-auto mb-10">
+                Tanyakan seputar kebijakan, dokumen internal, atau analisis khusus berdasarkan EnterpriseMind Knowledge Vault.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                {["Berapa hari cuti tahunan?", "Buatkan draft email peringatan SP1", "Analisis kebijakan WFH", "Siapa CEO perusahaan?"].map((suggestion, i) => (
+                  <motion.div
+                    key={i}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Card
+                      onClick={() => sendMessage(suggestion)}
+                      className="p-4 flex items-center justify-center text-sm font-medium text-slate-600 hover:text-[#0077ff] hover:border-[#0077ff]/30 hover:bg-[#0077ff]/5 bg-[#e6f0fa] border-slate-200 cursor-pointer transition-colors h-full shadow-sm text-center"
+                    >
+                      "{suggestion}"
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <div className="pt-8">
+              {messages.map((msg) => (
+                <MessageBubble key={msg.id} message={msg} />
               ))}
+              {isLoading && <LoadingIndicator />}
+              <div ref={messagesEndRef} className="h-4" />
             </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
-            ))}
-            {isLoading && <LoadingIndicator />}
-            <div ref={messagesEndRef} className="h-1" />
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      </ScrollArea>
 
-      {/* Technical Query Input (Fixed at bottom) */}
-      <div className="fixed bottom-margin left-[280px] right-[64px] flex justify-center z-10 bg-background/80 backdrop-blur-sm pt-4 pb-4 px-gutter">
-        <div className="w-full max-w-6xl">
-          <label htmlFor="query-input" className="block font-data-label text-data-label text-on-surface-variant uppercase tracking-widest mb-2">
-            Active Query Parameter
-          </label>
-          
-          <form 
+      {/* Floating Input Area */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#e6f0fa] via-[#e6f0fa] to-transparent pt-10 pb-6 px-6 pointer-events-none">
+        <div className="max-w-4xl mx-auto pointer-events-auto">
+          <motion.form 
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
             onSubmit={handleSubmit}
-            className="relative flex items-center w-full bg-surface-container-high border border-outline focus-within:border-secondary focus-within:ring-1 focus-within:ring-secondary transition-all rounded shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
+            className="relative flex items-end bg-[#e6f0fa] border border-slate-300 shadow-lg rounded-2xl p-2 focus-within:ring-2 focus-within:ring-[#0077ff]/20 focus-within:border-[#0077ff] transition-all"
           >
-            <Terminal className="absolute left-4 text-outline-variant w-5 h-5" />
+            <div className="flex-shrink-0 p-3 text-slate-400">
+              <Terminal className="w-5 h-5" />
+            </div>
+            
             <textarea
               id="query-input"
               ref={textareaRef}
@@ -106,22 +127,32 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               spellCheck="false"
-              placeholder="ANALYZE correlation BETWEEN..."
+              placeholder="Tanyakan sesuatu..."
               disabled={isLoading}
               rows={1}
-              className="w-full bg-transparent border-none text-on-surface font-data-mono text-data-mono py-4 pl-12 pr-12 focus:ring-0 focus:outline-none resize-none placeholder:text-outline-variant/50"
+              className="flex-1 bg-transparent border-none py-3 px-2 focus:ring-0 focus:outline-none resize-none min-h-[44px] max-h-[120px] text-slate-800 placeholder:text-slate-400"
             />
-            <button
-              type="submit"
-              disabled={!inputValue.trim() || isLoading}
-              className="absolute right-4 text-outline-variant hover:text-secondary transition-colors disabled:opacity-50 disabled:hover:text-outline-variant cursor-pointer flex items-center justify-center"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
+            
+            <div className="p-1 flex-shrink-0">
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!inputValue.trim() || isLoading}
+                className={`h-10 w-10 rounded-xl transition-all ${
+                  inputValue.trim() && !isLoading 
+                    ? "bg-[#0077ff] hover:bg-[#0047b3] text-white shadow-md" 
+                    : "bg-slate-100 text-slate-400"
+                }`}
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </motion.form>
+          <div className="text-center mt-2">
+            <span className="text-[10px] text-slate-400 font-medium">EnterpriseMind AI dapat melakukan kesalahan. Harap verifikasi informasi penting.</span>
+          </div>
         </div>
       </div>
-
     </div>
   );
 }
