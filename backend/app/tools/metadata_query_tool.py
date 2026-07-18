@@ -1,42 +1,38 @@
 """
 Metadata Query Tool — EnterpriseMind AI.
 
-Digunakan untuk mengecek daftar dokumen yang tersedia (metadata)
-dari database Supabase. Berguna ketika user bertanya "dokumen apa saja
-yang kamu tahu?" atau "apakah ada kebijakan WFH?".
+Digunakan untuk mengecek daftar dokumen yang tersedia (metadata).
+Berguna ketika user bertanya "dokumen apa saja yang kamu tahu?".
 
 Sifat: READ-ONLY (SELECT query).
 """
-
 import logging
 
-from app.core.supabase_client import get_supabase_client
+from app.core.postgres_client import fetch_all
 
 logger = logging.getLogger(__name__)
 
 
-def query_document_metadata(category_filter: str = None) -> list[dict]:
-    """
-    Ambil list metadata dokumen dari database.
-
-    Args:
-        category_filter: Opsional. Filter berdasarkan kategori dokumen.
-
-    Returns:
-        List dari dokumen metadata (filename, category, created_at).
-    """
+async def query_document_metadata(category_filter: str = None) -> list[dict]:
+    """Ambil list metadata dokumen dari database."""
     logger.info("Mengambil metadata dokumen, filter_kategori=%s", category_filter)
-    
+
     try:
-        client = get_supabase_client()
-        query = client.table("documents").select("filename, category, created_at")
-        
         if category_filter:
-            query = query.eq("category", category_filter)
-            
-        result = query.execute()
-        return result.data or []
-        
+            query = """
+                SELECT filename, category, status, chunk_count, created_at
+                FROM documents
+                WHERE category = $1
+                ORDER BY created_at DESC
+            """
+            return await fetch_all(query, category_filter)
+        else:
+            query = """
+                SELECT filename, category, status, chunk_count, created_at
+                FROM documents
+                ORDER BY created_at DESC
+            """
+            return await fetch_all(query)
     except Exception as e:
         logger.error("Gagal query metadata: %s", e)
         return [{"error": "Gagal mengakses metadata dokumen."}]

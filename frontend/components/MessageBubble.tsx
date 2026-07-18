@@ -25,7 +25,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   if (isUser) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 10, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.3 }}
@@ -33,11 +33,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       >
         <div className="flex gap-4 max-w-[80%] items-start flex-row-reverse">
           <Avatar className="w-10 h-10 border border-slate-200 shadow-sm mt-1">
-            <AvatarFallback className="bg-slate-100 text-slate-600">
+            <AvatarFallback className="bg-[#0077ff] text-white">
               <User className="w-5 h-5" />
             </AvatarFallback>
           </Avatar>
-          <div className="bg-slate-900 text-white rounded-2xl rounded-tr-sm p-4 px-5 shadow-sm">
+          <div className="bg-[#004790] text-white rounded-2xl rounded-tr-sm p-4 px-5 shadow-sm">
             <p className="text-sm font-medium leading-relaxed">
               {message.content}
             </p>
@@ -53,8 +53,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = mounted ? circumference - (confidenceScore / 100) * circumference : circumference;
 
+  const confColor = confidenceScore >= 70 ? "#10b981" : confidenceScore >= 40 ? "#f59e0b" : "#dc2626";
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
@@ -69,31 +71,32 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         <div className="flex-1 space-y-4">
           {/* AI Answer Area */}
-          <Card className="border-slate-200 shadow-sm overflow-hidden bg-[#e6f0fa]">
-            <div className="bg-slate-50 border-b border-slate-100 px-6 py-3 flex justify-between items-center">
+          <Card className="border-slate-200 shadow-sm overflow-hidden bg-white">
+            <div className="bg-[#f8fafc] border-b border-slate-100 px-6 py-3 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
                 <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Verified Response
                 </span>
               </div>
-              
+
               {/* Confidence Dial */}
               <div className="flex items-center gap-2" title="Confidence Score">
                 <div className="relative w-6 h-6">
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 48 48">
-                    <circle 
-                      className="text-slate-200" 
-                      cx="24" cy="24" r={radius} 
-                      fill="none" stroke="currentColor" strokeWidth="6" 
-                    />
-                    <circle 
-                      className="text-[#0077ff] transition-all duration-1000 ease-out" 
-                      cx="24" cy="24" r={radius} 
+                    <circle
+                      className="text-slate-200"
+                      cx="24" cy="24" r={radius}
                       fill="none" stroke="currentColor" strokeWidth="6"
+                    />
+                    <circle
+                      className="transition-all duration-1000 ease-out"
+                      cx="24" cy="24" r={radius}
+                      fill="none" stroke={confColor} strokeWidth="6"
                       strokeLinecap="round"
                       strokeDasharray={circumference}
                       strokeDashoffset={strokeDashoffset}
+                      style={{ color: confColor }}
                     />
                   </svg>
                 </div>
@@ -103,7 +106,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
             <CardContent className="p-4 sm:p-6">
               <div className="text-slate-800 text-sm leading-relaxed space-y-4 prose prose-slate max-w-none prose-p:leading-relaxed prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 prose-a:text-[#0077ff] hover:prose-a:text-[#0077ff]/80">
-                <ReactMarkdown 
+                <ReactMarkdown
                   rehypePlugins={[rehypeSanitize]}
                   components={{
                     a: ({node, ...props}) => {
@@ -114,28 +117,28 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                           </Badge>
                         );
                       }
-                      return <a {...props} />
+                      return <a {...props} />;
                     }
                   }}
                 >
-                  {message.content.replace(/\[(Sumber[^\]]*)\]/gi, "[$1](#citation)")}
+                  {message.content.replace(/\[(Sumber[^\]]*|\d+)\](?!\()/gi, "[$1](#citation)")}
                 </ReactMarkdown>
-                
+
                 {/* Action Items Box */}
-                {message.actionItems && message.actionItems.length > 0 && (
-                  <motion.div 
+                {Array.isArray(message.actionItems) && message.actionItems.length > 0 && (
+                  <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     transition={{ delay: 0.5 }}
-                    className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200/50"
+                    className="mt-6 p-4 bg-[#F2C300]/10 rounded-xl border border-[#F2C300]/30"
                   >
-                    <div className="flex items-center gap-2 text-amber-700 font-semibold text-xs uppercase tracking-wide mb-2">
+                    <div className="flex items-center gap-2 text-[#d8a815] font-semibold text-xs uppercase tracking-wide mb-2">
                       <Zap className="w-4 h-4" /> Recommended Action
                     </div>
                     <ul className="space-y-2 text-sm text-slate-700">
                       {message.actionItems.map((item: any, i: number) => (
                         <li key={i} className="flex gap-2">
-                          <span className="text-amber-500 font-bold">&gt;</span>
+                          <span className="text-[#F2C300] font-bold">&gt;</span>
                           <span>{item.draft_content || item.action_type}</span>
                         </li>
                       ))}
@@ -147,8 +150,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </Card>
 
           {/* Citations Section */}
-          {message.citations && message.citations.length > 0 && (
-            <motion.div 
+          {Array.isArray(message.citations) && message.citations.length > 0 && (
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.7 }}

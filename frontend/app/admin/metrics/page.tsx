@@ -18,7 +18,7 @@ export default function MetricsDashboard() {
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 md:px-8">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-6 sm:mb-8"
@@ -31,10 +31,9 @@ export default function MetricsDashboard() {
 
       {/* Top Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        
         {/* Total Verifications */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-          <Card className="shadow-sm border-slate-200 overflow-hidden bg-[#e6f0fa] relative group">
+          <Card className="shadow-sm border-slate-200 overflow-hidden bg-white relative group">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-transparent">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Total Verifications
@@ -46,7 +45,7 @@ export default function MetricsDashboard() {
                 {metrics?.total_queries?.toLocaleString() || "0"}
               </div>
               <p className="text-xs text-emerald-600 flex items-center mt-2 font-medium">
-                <TrendingUp className="w-3.5 h-3.5 mr-1" /> 
+                <TrendingUp className="w-3.5 h-3.5 mr-1" />
                 +2.4% vs minggu lalu
               </p>
             </CardContent>
@@ -55,12 +54,12 @@ export default function MetricsDashboard() {
 
         {/* Average Confidence Dial */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="shadow-sm border-slate-200 overflow-hidden bg-[#e6f0fa] relative">
+          <Card className="shadow-sm border-slate-200 overflow-hidden bg-white relative">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-transparent">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Avg Confidence
               </CardTitle>
-              <Percent className="h-5 w-5 text-[#0077ff]" />
+              <Percent className="h-5 h-5 text-[#0077ff]" />
             </CardHeader>
             <CardContent className="flex items-center justify-between py-2">
               <div className="text-3xl font-bold text-slate-900">
@@ -69,12 +68,12 @@ export default function MetricsDashboard() {
               <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
                 <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" strokeWidth="10" />
-                  <circle 
-                    cx="50" cy="50" r="40" fill="none" 
-                    stroke="#0077ff" 
-                    strokeWidth="10" 
-                    strokeDasharray="251.2" 
-                    strokeDashoffset={251.2 - (251.2 * (metrics?.avg_confidence_score || 0))} 
+                  <circle
+                    cx="50" cy="50" r="40" fill="none"
+                    stroke="#0077ff"
+                    strokeWidth="10"
+                    strokeDasharray="251.2"
+                    strokeDashoffset={251.2 - (251.2 * (metrics?.avg_confidence_score || 0))}
                     strokeLinecap="round"
                   />
                 </svg>
@@ -85,12 +84,12 @@ export default function MetricsDashboard() {
 
         {/* Documents Indexed */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-          <Card className="shadow-sm border-slate-200 overflow-hidden bg-[#e6f0fa] relative group">
+          <Card className="shadow-sm border-slate-200 overflow-hidden bg-white relative group">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-transparent">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Documents Indexed
               </CardTitle>
-              <FileText className="h-5 w-5 text-[#ffcc00]" />
+              <FileText className="h-5 h-5 text-[#F2C300]" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-slate-900">
@@ -105,9 +104,9 @@ export default function MetricsDashboard() {
       </div>
 
       {/* Recent Analysis Feed */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }} 
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
         className="space-y-4"
       >
@@ -122,7 +121,7 @@ export default function MetricsDashboard() {
         </div>
 
         {/* Mobile Cards */}
-        <Card className="shadow-sm border-slate-200 overflow-hidden bg-[#e6f0fa] md:hidden">
+        <Card className="shadow-sm border-slate-200 overflow-hidden bg-white md:hidden">
           <CardContent className="p-0">
             {metrics?.recent_logs?.length > 0 ? (
               <div className="divide-y divide-slate-200/60">
@@ -131,17 +130,17 @@ export default function MetricsDashboard() {
                   let status = "Processing";
                   let statusColor = "bg-amber-100 text-amber-800 border-amber-200";
                   let progressColor = "#f59e0b";
-                  
-                  if (conf >= 80) { 
-                    status = "Verified"; 
+
+                  if (conf >= 80) {
+                    status = "Verified";
                     statusColor = "bg-emerald-100 text-emerald-800 border-emerald-200";
                     progressColor = "#0077ff";
-                  } else if (conf >= 50) { 
-                    status = "Review"; 
+                  } else if (conf >= 50) {
+                    status = "Review";
                     statusColor = "bg-blue-100 text-blue-800 border-blue-200";
                     progressColor = "#3b82f6";
-                  } else if (conf > 0) { 
-                    status = "Flagged"; 
+                  } else if (conf > 0) {
+                    status = "Flagged";
                     statusColor = "bg-rose-100 text-rose-800 border-rose-200";
                     progressColor = "#f43f5e";
                   }
@@ -156,11 +155,11 @@ export default function MetricsDashboard() {
                           <div className="relative w-6 h-6 flex items-center justify-center shrink-0">
                             <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
                               <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" strokeWidth="12" />
-                              <circle 
-                                cx="50" cy="50" r="40" fill="none" 
-                                stroke={progressColor} 
-                                strokeWidth="12" 
-                                strokeDasharray="251.2" 
+                              <circle
+                                cx="50" cy="50" r="40" fill="none"
+                                stroke={progressColor}
+                                strokeWidth="12"
+                                strokeDasharray="251.2"
                                 strokeDashoffset={251.2 - (251.2 * (conf / 100))}
                               />
                             </svg>
@@ -186,10 +185,10 @@ export default function MetricsDashboard() {
         </Card>
 
         {/* Desktop Table */}
-        <Card className="shadow-sm border-slate-200 overflow-hidden bg-[#e6f0fa] hidden md:block">
-          <div className="overflow-x-auto bg-[#e6f0fa]">
-            <Table className="bg-[#e6f0fa]">
-              <TableHeader className="bg-[#0077ff]/5">
+        <Card className="shadow-sm border-slate-200 overflow-hidden bg-white hidden md:block">
+          <div className="overflow-x-auto bg-white">
+            <Table className="bg-white">
+              <TableHeader className="bg-[#f8fafc]">
                 <TableRow className="bg-transparent hover:bg-transparent border-b border-slate-200">
                   <TableHead className="font-semibold text-slate-700 px-4">Query ID</TableHead>
                   <TableHead className="font-semibold text-slate-700 px-4">Target Entity</TableHead>
@@ -198,24 +197,24 @@ export default function MetricsDashboard() {
                   <TableHead className="font-semibold text-slate-700 text-right px-4">Waktu</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="bg-[#e6f0fa]">
+              <TableBody className="bg-white">
                 {metrics?.recent_logs?.length > 0 ? (
                   metrics.recent_logs.map((log: any) => {
                     const conf = log.confidence_score ? Math.floor(log.confidence_score * 100) : 0;
                     let status = "Processing";
                     let statusColor = "bg-amber-100 text-amber-800 border-amber-200";
                     let progressColor = "#f59e0b";
-                    
-                    if (conf >= 80) { 
-                      status = "Verified"; 
+
+                    if (conf >= 80) {
+                      status = "Verified";
                       statusColor = "bg-emerald-100 text-emerald-800 border-emerald-200";
                       progressColor = "#0077ff";
-                    } else if (conf >= 50) { 
-                      status = "Review"; 
+                    } else if (conf >= 50) {
+                      status = "Review";
                       statusColor = "bg-blue-100 text-blue-800 border-blue-200";
                       progressColor = "#3b82f6";
-                    } else if (conf > 0) { 
-                      status = "Flagged"; 
+                    } else if (conf > 0) {
+                      status = "Flagged";
                       statusColor = "bg-rose-100 text-rose-800 border-rose-200";
                       progressColor = "#f43f5e";
                     }
@@ -233,11 +232,11 @@ export default function MetricsDashboard() {
                             <div className="relative w-6 h-6 flex items-center justify-center shrink-0">
                               <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
                                 <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" strokeWidth="12" />
-                                <circle 
-                                  cx="50" cy="50" r="40" fill="none" 
-                                  stroke={progressColor} 
-                                  strokeWidth="12" 
-                                  strokeDasharray="251.2" 
+                                <circle
+                                  cx="50" cy="50" r="40" fill="none"
+                                  stroke={progressColor}
+                                  strokeWidth="12"
+                                  strokeDasharray="251.2"
                                   strokeDashoffset={251.2 - (251.2 * (conf / 100))}
                                 />
                               </svg>

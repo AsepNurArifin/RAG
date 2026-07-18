@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { ShieldCheck, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
+import { ShieldCheck, Mail, Lock, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -39,8 +39,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full min-h-screen flex items-center justify-center bg-gradient-to-r from-[#F2C300] via-[#FFF5D6] via-[#9CE3CC] via-[#00A6D6] to-[#0057A8] p-6 relative overflow-hidden">
-      {/* Background decoration with PT Pusri Brand Colors */}
+    <div className="w-full min-h-screen flex items-center justify-center bg-[#f8fafc] p-6 relative overflow-hidden">
+      {/* Background decoration */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#0077ff]/10 rounded-full blur-3xl opacity-30 pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-[#F2C300]/10 rounded-full blur-3xl opacity-30 pointer-events-none" />
 
@@ -55,19 +55,19 @@ export default function LoginPage() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
-            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[#e6f0fa] shadow-md border border-[#0077ff]/20 mb-6"
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[#004790] shadow-md mb-6"
           >
-            <ShieldCheck className="w-10 h-10 text-[#0057A8]" />
+            <Sparkles className="w-10 h-10 text-white" />
           </motion.div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 drop-shadow-sm">
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
             EnterpriseMind AI
           </h1>
-          <p className="text-base font-semibold text-slate-700 mt-2 bg-white/20 backdrop-blur-xs inline-block px-3 py-1 rounded-full border border-white/30">
+          <p className="text-base font-semibold text-slate-600 mt-2 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm inline-block">
             Internal Knowledge Assistant — Secure Login
           </p>
         </div>
 
-        <Card className="shadow-2xl border border-[#0077ff]/20 backdrop-blur-md bg-[#e6f0fa]/95 p-4 md:p-6 rounded-2xl">
+        <Card className="shadow-xl border border-slate-200 bg-white p-4 md:p-6 rounded-2xl">
           <CardHeader className="pb-6">
             <CardTitle className="text-2xl text-center text-slate-900 font-bold">Masuk ke Sistem</CardTitle>
             <CardDescription className="text-center text-base text-slate-600 mt-1">
@@ -97,7 +97,7 @@ export default function LoginPage() {
                     placeholder="nama@perusahaan.com"
                     required
                     disabled={isSubmitting}
-                    className="h-12 pl-12 pr-4 text-base bg-[#e6f0fa] border-[#0077ff]/30 focus-visible:ring-[#0077ff] text-slate-800 rounded-xl"
+                    className="h-12 pl-12 pr-4 text-base bg-white border-slate-300 focus-visible:ring-[#0077ff] text-slate-800 rounded-xl"
                   />
                 </div>
               </div>
@@ -116,14 +116,14 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     required
                     disabled={isSubmitting}
-                    className="h-12 pl-12 pr-4 text-base bg-[#e6f0fa] border-[#0077ff]/30 focus-visible:ring-[#0077ff] text-slate-800 rounded-xl"
+                    className="h-12 pl-12 pr-4 text-base bg-white border-slate-300 focus-visible:ring-[#0077ff] text-slate-800 rounded-xl"
                   />
                 </div>
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-[#0057A8] hover:bg-[#004790] text-white shadow-lg hover:shadow-xl transition-all mt-6 text-base font-bold rounded-xl cursor-pointer"
+                className="w-full h-12 bg-[#0077ff] hover:bg-[#0047b3] text-white shadow-lg hover:shadow-xl transition-all mt-6 text-base font-bold rounded-xl cursor-pointer"
                 disabled={isSubmitting || !email || !password}
               >
                 {isSubmitting ? (
@@ -137,7 +137,7 @@ export default function LoginPage() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center flex-col gap-4 border-t border-slate-200/50 pt-6 mt-6">
+          <CardFooter className="flex justify-center flex-col gap-4 border-t border-slate-200 pt-6 mt-6">
             <p className="text-center text-sm text-slate-600 font-medium">
               Hubungi admin jika Anda belum memiliki akun.
             </p>

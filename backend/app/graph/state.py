@@ -50,6 +50,13 @@ class GraphState(TypedDict):
     orchestrator_reasoning: str
     """Alasan/penjelasan routing decision dari Orchestrator."""
 
+    intent_type: str
+    """Tipe intent dari tiered classifier: factual, comprehensive,
+    analytical, procedural, comparison, action_request, greeting, ambiguous."""
+
+    intent_confidence: float
+    """Confidence score dari tiered classifier (0-1)."""
+
     # ------------------------------------------------------------------ #
     # Researcher Output
     # ------------------------------------------------------------------ #

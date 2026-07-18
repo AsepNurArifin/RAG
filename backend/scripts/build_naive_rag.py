@@ -91,7 +91,7 @@ def naive_rag_query(question: str, k: int = 5) -> dict:
         "answer": response.content,
         "retrieved_docs": len(docs),
         "latency_ms": elapsed_ms,
-        "model": settings.FAST_MODEL,
+        "model": settings.GEMINI_MODEL,
         "type": "naive_rag",
     }
 

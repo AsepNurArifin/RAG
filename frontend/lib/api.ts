@@ -86,6 +86,7 @@ export const api = {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let receivedResult = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -104,8 +105,10 @@ export const api = {
               if (data.type === "agent") {
                 onAgentUpdate(data.agent);
               } else if (data.type === "result") {
+                receivedResult = true;
                 onResult(data);
               } else if (data.type === "error") {
+                receivedResult = true;
                 onError(new Error(data.message));
               }
             } catch (e) {
@@ -113,6 +116,11 @@ export const api = {
             }
           }
         }
+      }
+
+      // Stream ended without a result or error event — backend likely crashed
+      if (!receivedResult) {
+        onError(new Error("Koneksi ke server terputus. Silakan coba lagi."));
       }
     } catch (e: any) {
       onError(e);

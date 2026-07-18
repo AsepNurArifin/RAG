@@ -42,15 +42,27 @@ export function useChatStream(initialSessionId?: string) {
   const loadSessionHistory = useCallback(async (sid: string) => {
     try {
       const data = await api.getSessionMessages(sid);
-      const loaded: Message[] = data.map((raw: Record<string, any>, i: number) => ({
-        id: raw.id || `hist-${i}`,
-        role: raw.role,
-        content: raw.content,
-        citations: raw.citations || [],
-        actionItems: raw.action_items || [],
-        confidenceScore: raw.confidence_score,
-        latencyMs: raw.latency_ms,
-      }));
+      const loaded: Message[] = data.map((raw: Record<string, any>, i: number) => {
+        let parsedCitations = raw.citations || [];
+        let parsedActionItems = raw.action_items || [];
+        
+        if (typeof parsedCitations === 'string') {
+          try { parsedCitations = JSON.parse(parsedCitations); } catch(e) { parsedCitations = []; }
+        }
+        if (typeof parsedActionItems === 'string') {
+          try { parsedActionItems = JSON.parse(parsedActionItems); } catch(e) { parsedActionItems = []; }
+        }
+
+        return {
+          id: raw.id || `hist-${i}`,
+          role: raw.role,
+          content: raw.content,
+          citations: parsedCitations,
+          actionItems: parsedActionItems,
+          confidenceScore: raw.confidence_score,
+          latencyMs: raw.latency_ms,
+        };
+      });
       setMessages(loaded);
       setSessionId(sid);
     } catch (err) {

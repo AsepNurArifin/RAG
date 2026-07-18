@@ -1,7 +1,7 @@
 # Environment & secrets
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -37,3 +37,23 @@ build/
 
 # Logs
 *.log
+
+# ============================================
+# Project-specific
+# ============================================
+
+# Debug/test scripts (dibuat saat development)
+test_*.py
+diag_test.py
+test_debug_pipeline.py
+test_hybrid_extractor.py
+test_pipeline.py
+
+# User uploads
+uploads/
+
+# Milvus local data (jika persist ke disk)
+milvus_data/
+
+# Temporal local data
+temporal_data/

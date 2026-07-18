@@ -10,7 +10,6 @@ Endpoints:
     PUT    /api/users/{id}  — Update user
     DELETE /api/users/{id}  — Hapus user
 """
-
 import logging
 from datetime import datetime, timezone
 
@@ -18,20 +17,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.core.auth import hash_password, require_admin
-from app.core.supabase_client import get_supabase_client
+from app.core.postgres_client import fetch_one, fetch_all, execute_query
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
 
-# ------------------------------------------------------------------ #
-# Request Models
-# ------------------------------------------------------------------ #
-
-
 class CreateUserRequest(BaseModel):
-    """Request body untuk membuat user baru."""
     email: str
     password: str
     full_name: str
@@ -39,15 +32,9 @@ class CreateUserRequest(BaseModel):
 
 
 class UpdateUserRequest(BaseModel):
-    """Request body untuk update user."""
     full_name: str | None = None
     role: str | None = None
     is_active: bool | None = None
-
-
-# ------------------------------------------------------------------ #
-# Endpoints
-# ------------------------------------------------------------------ #
 
 
 @router.get("")
@@ -57,74 +44,39 @@ async def list_users(
     admin: dict = Depends(require_admin),
 ):
     """List semua user dengan pagination. Hanya admin."""
-    client = get_supabase_client()
-    result = (
-        client.table("users")
-        .select("id, email, full_name, role, is_active, created_at")
-        .order("created_at", desc=True)
-        .limit(limit)
-        .range(offset, offset + limit - 1)
-        .execute()
-    )
-    return result.data
+    query = """
+        SELECT id, email, full_name, role, is_active, department, clearance_level, created_at
+        FROM users
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2
+    """
+    users = await fetch_all(query, limit, offset)
+    # Convert UUID to string
+    for user in users:
+        user["id"] = str(user["id"])
+    return users
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_user(body: CreateUserRequest, admin: dict = Depends(require_admin)):
+    """Buat user baru. Hanya admin."""
+    existing = await fetch_one("SELECT id FROM users WHERE email = $1", body.email)
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email sudah terdaftar.")
+
+    if body.role not in ("admin", "user", "analyst", "viewer"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role tidak valid.")
+
+    query = """
+        INSERT INTO users (email, password_hash, full_name, role, is_active)
+        VALUES ($1, $2, $3, $4, true)
+        RETURNING id, email, full_name, role, is_active, created_at
     """
-    Buat user baru. Hanya admin.
+    user = await fetch_one(query, body.email, hash_password(body.password), body.full_name, body.role)
 
-    Raises:
-        HTTPException 400 jika email sudah terdaftar.
-    """
-    client = get_supabase_client()
-
-    # Cek apakah email sudah ada
-    existing = (
-        client.table("users")
-        .select("id")
-        .eq("email", body.email)
-        .execute()
-    )
-    if existing.data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email sudah terdaftar.",
-        )
-
-    # Validasi role
-    if body.role not in ("admin", "user"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Role harus 'admin' atau 'user'.",
-        )
-
-    # Hash password dan simpan
-    data = {
-        "email": body.email,
-        "password_hash": hash_password(body.password),
-        "full_name": body.full_name,
-        "role": body.role,
-        "is_active": True,
-    }
-    result = client.table("users").insert(data).execute()
-
-    logger.info(
-        "User dibuat oleh admin %s: email=%s, role=%s",
-        admin["email"],
-        body.email,
-        body.role,
-    )
-
-    user = result.data[0]
-    return {
-        "id": user["id"],
-        "email": user["email"],
-        "full_name": user["full_name"],
-        "role": user["role"],
-        "is_active": user["is_active"],
-        "created_at": user["created_at"],
-    }
+    logger.info("User dibuat oleh admin %s: email=%s, role=%s", admin["email"], body.email, body.role)
+    user["id"] = str(user["id"])
+    return user
 
 
 @router.put("/{user_id}")
@@ -134,52 +86,47 @@ async def update_user(
     admin: dict = Depends(require_admin),
 ):
     """Update user. Hanya admin."""
-    client = get_supabase_client()
+    update_parts = ["updated_at = NOW()"]
+    params = []
+    idx = 1
 
-    update_data: dict = {
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
     if body.full_name is not None:
-        update_data["full_name"] = body.full_name
+        update_parts.append(f"full_name = ${idx}")
+        params.append(body.full_name)
+        idx += 1
     if body.role is not None:
-        if body.role not in ("admin", "user"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Role harus 'admin' atau 'user'.",
-            )
-        update_data["role"] = body.role
+        if body.role not in ("admin", "user", "analyst", "viewer"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role tidak valid.")
+        update_parts.append(f"role = ${idx}")
+        params.append(body.role)
+        idx += 1
     if body.is_active is not None:
-        update_data["is_active"] = body.is_active
+        update_parts.append(f"is_active = ${idx}")
+        params.append(body.is_active)
+        idx += 1
 
-    result = (
-        client.table("users")
-        .update(update_data)
-        .eq("id", user_id)
-        .execute()
-    )
+    params.append(str(user_id))
+    query = f"""
+        UPDATE users SET {', '.join(update_parts)}
+        WHERE id = ${idx}
+        RETURNING id, email, full_name, role, is_active, created_at
+    """
+    user = await fetch_one(query, *params)
 
-    if not result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User tidak ditemukan.",
-        )
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User tidak ditemukan.")
 
     logger.info("User diupdate oleh admin %s: user_id=%s", admin["email"], user_id)
-    return result.data[0]
+    user["id"] = str(user["id"])
+    return user
 
 
 @router.delete("/{user_id}")
 async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
     """Hapus user. Hanya admin."""
-    client = get_supabase_client()
+    if str(user_id) == str(admin["id"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Anda tidak bisa menghapus akun Anda sendiri.")
 
-    # Jangan izinkan admin menghapus dirinya sendiri
-    if user_id == admin["id"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Anda tidak bisa menghapus akun Anda sendiri.",
-        )
-
-    client.table("users").delete().eq("id", user_id).execute()
+    await execute_query("DELETE FROM users WHERE id = $1", str(user_id))
     logger.info("User dihapus oleh admin %s: user_id=%s", admin["email"], user_id)
     return {"message": "User berhasil dihapus."}

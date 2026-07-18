@@ -2,13 +2,11 @@
 RAGAS Runner — EnterpriseMind AI.
 
 Mengeksekusi evaluasi dan menghitung metrik RAGAS menggunakan
-Groq LLM sebagai evaluator (bukan OpenAI default).
+Gemini 2.5 Flash sebagai evaluator.
 
 Ref: SRS_PRD.md FR7.2, FR7.3 — evaluasi otomatis dengan RAGAS
 """
-
 import logging
-import os
 
 import pandas as pd
 from datasets import Dataset
@@ -36,7 +34,7 @@ def _get_metrics():
     )
 
     evaluator_llm = ChatGroq(
-        model=settings.FAST_MODEL,
+        model=settings.GROQ_MODEL_REASONING,
         api_key=settings.GROQ_API_KEY,
         temperature=0.0,
     )
@@ -55,7 +53,8 @@ def _get_metrics():
         if hasattr(m, "embeddings"):
             from langchain_huggingface import HuggingFaceEmbeddings
             m.embeddings = HuggingFaceEmbeddings(
-                model_name=settings.EMBEDDING_MODEL
+                model_name=settings.EMBEDDING_MODEL,
+                model_kwargs={"trust_remote_code": True},
             )
 
     return _METRICS_CACHE

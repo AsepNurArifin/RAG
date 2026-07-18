@@ -1,19 +1,13 @@
 """
 Document Embedder — EnterpriseMind AI.
 
-Generate embedding untuk chunk dokumen dan simpan ke Chroma vector store.
-Ref: FR1.4 di SRS_PRD.md — simpan embedding + metadata ke vector store.
-
-Usage:
-    from app.ingestion.embedder import embed_and_store
-
-    embed_and_store(chunks)  # chunks dari chunker.py
+Generate embeddings dan simpan ke Milvus vector store.
+Singleton pattern untuk embedding model dan vector store.
 """
-
 import logging
 
-from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_milvus import Milvus
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from app.core.config import settings
 from app.ingestion.chunker import DocumentChunk
@@ -21,156 +15,135 @@ from app.ingestion.chunker import DocumentChunk
 logger = logging.getLogger(__name__)
 
 _embedding_model = None
-_vector_store = None
 
 
 def get_embedding_model() -> HuggingFaceEmbeddings:
-    """
-    Dapatkan singleton embedding model instance.
-
-    Returns:
-        HuggingFaceEmbeddings yang sudah diinisialisasi.
-
-    Side effects:
-        Download model pada pemanggilan pertama (jika belum di-cache).
-    """
+    """Singleton. Downloads model on first call if not cached."""
     global _embedding_model
     if _embedding_model is None:
-        logger.info(
-            "Inisialisasi embedding model: %s", settings.EMBEDDING_MODEL
-        )
+        logger.info("Inisialisasi embedding model: %s", settings.EMBEDDING_MODEL)
         _embedding_model = HuggingFaceEmbeddings(
             model_name=settings.EMBEDDING_MODEL,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True},
+            model_kwargs={
+                "device": "cpu",
+                "trust_remote_code": True,
+            },
+            encode_kwargs={
+                "normalize_embeddings": True,
+            },
         )
     return _embedding_model
 
 
-def get_vector_store() -> Chroma:
-    """
-    Dapatkan singleton Chroma vector store instance.
+def get_vector_store() -> Milvus:
+    """Connects to Milvus standalone server with robust connection handling."""
+    from pymilvus import connections
 
-    Returns:
-        Chroma vector store yang sudah terhubung ke persistent directory
-        atau Chroma server (Docker).
+    logger.info("Inisialisasi Milvus vector store: uri=%s, collection=%s", settings.MILVUS_URI, settings.MILVUS_COLLECTION)
 
-    Side effects:
-        Membuat direktori persistent jika belum ada.
-    """
-    global _vector_store
-    if _vector_store is None:
-        if settings.CHROMA_HOST:
-            _vector_store = _init_chroma_client()
-            logger.info(
-                "Terhubung ke Chroma server: %s:%s",
-                settings.CHROMA_HOST,
-                settings.CHROMA_PORT,
-            )
+    # Establish connection if not already connected
+    try:
+        if not connections.has_connection("default"):
+            logger.info("Connecting to Milvus at %s...", settings.MILVUS_URI)
+            connections.connect(alias="default", uri=settings.MILVUS_URI)
+            logger.info("Milvus connection established.")
         else:
-            logger.info(
-                "Inisialisasi Chroma persistent: dir=%s",
-                settings.CHROMA_PERSIST_DIRECTORY,
-            )
-            _vector_store = Chroma(
-                collection_name="enterprisemind_documents",
-                embedding_function=get_embedding_model(),
-                persist_directory=settings.CHROMA_PERSIST_DIRECTORY,
-            )
-    return _vector_store
+            logger.debug("Milvus connection 'default' already exists.")
+    except Exception as e:
+        logger.error("Gagal koneksi ke Milvus: %s — %s", type(e).__name__, e)
+        raise RuntimeError(f"Tidak bisa koneksi ke Milvus di {settings.MILVUS_URI}: {e}") from e
 
-
-def _init_chroma_client() -> Chroma:
-    """Inisialisasi Chroma HTTP client untuk Docker deployment."""
-    import chromadb
-
-    client = chromadb.HttpClient(
-        host=settings.CHROMA_HOST,
-        port=settings.CHROMA_PORT,
-    )
-
-    return Chroma(
-        client=client,
-        collection_name="enterprisemind_documents",
+    return Milvus(
         embedding_function=get_embedding_model(),
+        connection_args={"uri": settings.MILVUS_URI},
+        collection_name=settings.MILVUS_COLLECTION,
+        auto_id=False,
     )
 
 
 def embed_and_store(chunks: list[DocumentChunk]) -> int:
-    """
-    Embed chunk dokumen dan simpan ke Chroma vector store.
-
-    Args:
-        chunks: List DocumentChunk dari chunker.py.
-
-    Returns:
-        Jumlah chunk yang berhasil disimpan.
-
-    Raises:
-        RuntimeError: Jika proses embedding/penyimpanan gagal.
-
-    Side effects:
-        - Memanggil embedding model (compute intensif).
-        - Menulis ke Chroma persistent storage (I/O).
-    """
+    """Embed chunks and store to Chroma. Returns count of stored chunks."""
     if not chunks:
         logger.warning("Tidak ada chunk untuk di-embed.")
         return 0
 
     store = get_vector_store()
-
     texts = [chunk.content for chunk in chunks]
     metadatas = [chunk.metadata for chunk in chunks]
 
-    # Generate unique IDs berdasarkan filename + chunk index
     ids = [
         f"{meta.get('filename', 'unknown')}__chunk_{meta.get('chunk_index', i)}"
         for i, meta in enumerate(metadatas)
     ]
 
-    logger.info(
-        "Embedding %d chunks dari '%s'...",
-        len(chunks),
-        chunks[0].metadata.get("filename", "unknown"),
-    )
+    logger.info("Embedding %d chunks dari '%s'...", len(chunks), chunks[0].metadata.get("filename", "unknown"))
 
     try:
-        store.add_texts(
-            texts=texts,
-            metadatas=metadatas,
-            ids=ids,
-        )
-        logger.info(
-            "Berhasil menyimpan %d chunks ke vector store.", len(chunks)
-        )
+        store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+        logger.info("Berhasil menyimpan %d chunks ke vector store.", len(chunks))
         return len(chunks)
-
     except Exception as e:
-        raise RuntimeError(
-            f"Gagal embed dan simpan chunks: {e}"
-        ) from e
+        raise RuntimeError(f"Gagal embed dan simpan chunks: {e}") from e
+
+
+def embed_and_store_parent_child(
+    parent_chunks: list[DocumentChunk],
+    child_chunks: list[DocumentChunk],
+) -> tuple[int, int]:
+    """
+    Store parent-child chunks ke Chroma.
+
+    Strategy (Development):
+    - Child chunks: di-embed dan disimpan normal (untuk retrieval)
+    - Parent chunks: disimpan dengan metadata 'chunk_type=parent' (untuk context lookup)
+
+    Returns: (parent_count, child_count)
+    """
+    if not child_chunks:
+        logger.warning("Tidak ada child chunk untuk di-embed.")
+        return (0, 0)
+
+    store = get_vector_store()
+
+    # Store parent chunks (tidak di-embed, hanya disimpan untuk lookup)
+    if parent_chunks:
+        parent_texts = [chunk.content for chunk in parent_chunks]
+        parent_metadatas = [chunk.metadata for chunk in parent_chunks]
+        parent_ids = [
+            f"{meta.get('filename', 'unknown')}__parent_{meta.get('chunk_index', i)}"
+            for i, meta in enumerate(parent_metadatas)
+        ]
+
+        try:
+            store.add_texts(texts=parent_texts, metadatas=parent_metadatas, ids=parent_ids)
+            logger.info("Stored %d parent chunks ke vector store.", len(parent_chunks))
+        except Exception as e:
+            logger.warning("Gagal store parent chunks: %s", e)
+
+    # Store child chunks (di-embed untuk retrieval)
+    child_texts = [chunk.content for chunk in child_chunks]
+    child_metadatas = [chunk.metadata for chunk in child_chunks]
+    child_ids = [
+        meta.get('child_id', f"{meta.get('filename', 'unknown')}__child_{i}")
+        for i, meta in enumerate(child_metadatas)
+    ]
+
+    try:
+        store.add_texts(texts=child_texts, metadatas=child_metadatas, ids=child_ids)
+        logger.info("Embedded dan stored %d child chunks ke vector store.", len(child_chunks))
+    except Exception as e:
+        raise RuntimeError(f"Gagal embed child chunks: {e}") from e
+
+    return (len(parent_chunks), len(child_chunks))
 
 
 def delete_document_chunks(filename: str) -> None:
-    """
-    Hapus semua chunk dari vector store berdasarkan nama file.
-
-    Args:
-        filename: Nama file yang chunk-nya akan dihapus.
-
-    Side effects:
-        DELETE dari Chroma vector store.
-    """
+    """Delete all chunks for a given filename from Milvus."""
     store = get_vector_store()
-    # Filter by metadata filename
-    results = store.get(where={"filename": filename})
-
-    if results and results["ids"]:
-        store.delete(ids=results["ids"])
-        logger.info(
-            "Dihapus %d chunks untuk file '%s'",
-            len(results["ids"]),
-            filename,
-        )
-    else:
-        logger.info("Tidak ada chunk ditemukan untuk file '%s'", filename)
+    try:
+        store.col.load()
+        expr = f'filename == "{filename}"'
+        store.col.delete(expr=expr)
+        logger.info("Dihapus chunks untuk file '%s' dari Milvus.", filename)
+    except Exception as e:
+        logger.exception("Gagal menghapus chunks dari Milvus untuk %s", filename)

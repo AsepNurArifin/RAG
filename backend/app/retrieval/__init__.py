@@ -1,6 +1,13 @@
 """
-EnterpriseMind AI — Retrieval Package.
+Retrieval — EnterpriseMind AI.
 
-Modul pencarian dokumen: vector similarity search dan hybrid search.
-Ref: FR2.3 di SRS_PRD.md
+Re-export search functions.
 """
+from app.retrieval.hybrid_search import hybrid_search
+from app.retrieval.vector_store import similarity_search, similarity_search_with_scores
+
+__all__ = [
+    "hybrid_search",
+    "similarity_search",
+    "similarity_search_with_scores",
+]

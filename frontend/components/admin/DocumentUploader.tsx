@@ -34,7 +34,10 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
     try {
       await api.uploadDocument(file, category);
       setStatus({ type: "success", message: `Dokumen "${file.name}" berhasil diproses & di-index.` });
-      onUploadComplete();
+      // Beri waktu 1.5 detik agar Temporal Worker sempat mencatat dokumen ke Database
+      setTimeout(() => {
+        onUploadComplete();
+      }, 1500);
     } catch (error) {
       setStatus({ type: "error", message: error instanceof Error ? error.message : "Gagal mengupload dokumen." });
     } finally {
@@ -52,7 +55,7 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
           id="category-select"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="w-full p-2.5 bg-[#e6f0fa] border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
+          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
         >
           <option value="policies">Kebijakan Perusahaan (Policies)</option>
           <option value="technical">Dokumentasi Teknis (Technical)</option>
@@ -65,7 +68,7 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
         className={`border-2 border-dashed rounded-xl p-4 sm:p-8 text-center transition-all ${
           isUploading 
             ? "border-blue-500/50 bg-blue-50/50" 
-            : "border-slate-200 hover:border-slate-300 bg-[#e6f0fa]/50 hover:bg-[#e6f0fa]"
+            : "border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-white"
         }`}
       >
         {isUploading ? (
@@ -81,12 +84,12 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
           </div>
         ) : (
           <label className="flex flex-col items-center justify-center cursor-pointer">
-            <div className="p-3 bg-[#e6f0fa] border border-slate-200 shadow-sm rounded-full mb-3 text-slate-500">
+              <div className="p-3 bg-slate-100 border border-slate-200 shadow-sm rounded-full mb-3 text-slate-500">
               <UploadCloud className="w-6 h-6 sm:w-8 sm:h-8 text-[#0077ff]" />
             </div>
             <p className="text-sm font-semibold text-slate-800 mb-1">Klik untuk unggah dokumen</p>
             <p className="text-xs text-slate-500 mb-3 sm:mb-4">PDF, DOCX, TXT (Maks 5MB)</p>
-            <span className="inline-flex items-center justify-center rounded-md text-sm font-semibold transition-colors border border-slate-200 bg-[#e6f0fa] text-[#0077ff] hover:bg-[#0077ff]/5 shadow-sm h-9 px-4 py-2 select-none">
+              <span className="inline-flex items-center justify-center rounded-md text-sm font-semibold transition-colors border border-slate-200 bg-white text-[#0077ff] hover:bg-[#0077ff]/5 shadow-sm h-9 px-4 py-2 select-none">
               Pilih File
             </span>
             <input 

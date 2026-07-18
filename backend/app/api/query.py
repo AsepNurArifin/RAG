@@ -1,15 +1,9 @@
 """
 Query API — EnterpriseMind AI.
 
-Endpoint utama untuk menerima pertanyaan pengguna dan memprosesnya
-melalui multi-agent graph.
-
-Ref: FR2.1 di SRS_PRD.md, A.3.3 (endpoint /query)
-
-Endpoints:
-    POST /api/query — Kirim pertanyaan ke sistem multi-agent
+POST /api/query — Send question to multi-agent system. SSE streaming response.
+RBAC: Injects user profile filter for document retrieval.
 """
-
 import logging
 import time
 import uuid
@@ -23,68 +17,33 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.config import settings
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_user_rbac_filter
+from app.core.postgres_client import fetch_one, fetch_all, execute_query
 from app.db import log_query, save_message
 from app.graph.build_graph import build_agent_graph
-from app.core.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Query"])
 limiter = Limiter(key_func=get_remote_address)
 
-# Build graph sekali saat module di-import
 _agent_graph = None
 
 
 def _get_graph():
-    """Lazy initialization graph — build sekali, pakai berulang."""
+    """Lazy init — build once, reuse."""
     global _agent_graph
     if _agent_graph is None:
         _agent_graph = build_agent_graph()
     return _agent_graph
 
 
-# ------------------------------------------------------------------ #
-# Request / Response Models
-# ------------------------------------------------------------------ #
-
-
 class QueryRequest(BaseModel):
-    """Request body untuk /api/query."""
-
-    query: str = Field(
-        ...,
-        min_length=1,
-        max_length=2000,
-        description="Pertanyaan pengguna dalam bahasa natural.",
-    )
-    session_id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="ID sesi percakapan. Auto-generated jika tidak dikirim.",
-    )
-
-
-class CitationResponse(BaseModel):
-    """Satu item sitasi."""
-
-    source: str = ""
-    date: str = ""
-    excerpt: str = ""
-    relevance_score: float = 0.0
-
-
-class ActionItemResponse(BaseModel):
-    """Satu item action."""
-
-    action_type: str = ""
-    draft_content: str = ""
-    requires_human_review: bool = True
+    query: str = Field(..., min_length=1, max_length=2000)
+    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
 class QueryResponse(BaseModel):
-    """Response body untuk /api/query."""
-
     answer: str
     citations: list[dict] = []
     action_items: list[dict] = []
@@ -95,44 +54,33 @@ class QueryResponse(BaseModel):
     session_id: str = ""
 
 
-# ------------------------------------------------------------------ #
-# Endpoint
-# ------------------------------------------------------------------ #
-
-
 @router.post("/query")
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def process_query(
     request: Request,
     body: QueryRequest,
     user: dict = Depends(get_current_user),
-) -> QueryResponse:
-    """
-    Terima pertanyaan user, proses lewat agent graph, kembalikan jawaban.
-
-    Rate limited sesuai SECURITY.md #4 untuk melindungi kuota API Groq.
-
-    Args:
-        request: FastAPI Request (untuk rate limiter).
-        body: QueryRequest dengan query dan session_id.
-
-    Returns:
-        QueryResponse dengan jawaban, sitasi, action items, dan metrik.
-
-    Raises:
-        HTTPException 500: Jika proses query gagal.
-        HTTPException 429: Jika rate limit terlampaui.
-    """
+) -> StreamingResponse:
+    """Process query through agent graph. Returns SSE stream. RBAC-aware."""
     async def event_generator():
         start_time = time.time()
-        
+
         try:
             graph = _get_graph()
-            
+
+            # RBAC filter from user profile
+            rbac_filter = get_user_rbac_filter(user)
+
             initial_state = {
                 "query": body.query,
                 "session_id": body.session_id,
+                "user_id": str(user["id"]),
+                "user_department": user.get("department", "") or "",
+                "user_clearance_level": user.get("clearance_level", 1) or 1,
+                "rbac_filter": rbac_filter,
                 "intent": "",
+                "intent_type": "",
+                "intent_confidence": 0.0,
                 "agents_to_activate": [],
                 "orchestrator_reasoning": "",
                 "retrieved_documents": [],
@@ -149,88 +97,110 @@ async def process_query(
                 "error": None,
                 "query_deadline": time.time() + settings.QUERY_TIMEOUT_SECONDS,
             }
-            
-            # We will accumulate the state as we stream
+
             current_state = initial_state.copy()
-            
-            async for output in graph.astream(initial_state):
-                for node_name, state_update in output.items():
-                    # Send agent activation event
-                    yield f"data: {json.dumps({'type': 'agent', 'agent': node_name})}\n\n"
-                    await asyncio.sleep(0.01)
-                    # Update our current state with the deltas
-                    current_state.update(state_update)
-            
+            logger.info("[Query] Starting graph.astream for query: '%s...'", body.query[:60])
+
+            queue = asyncio.Queue()
+
+            async def run_graph():
+                try:
+                    node_count = 0
+                    async for output in graph.astream(initial_state):
+                        node_count += 1
+                        for node_name, state_update in output.items():
+                            logger.info("[Query] graph.astream yielded node #%d: %s", node_count, node_name)
+                            current_state.update(state_update)
+                            await queue.put({"type": "agent", "agent": node_name})
+                    logger.info("[Query] graph.astream completed. Total nodes: %d", node_count)
+                    await queue.put({"type": "done"})
+                except Exception as e:
+                    logger.exception("[Query] Graph execution failed")
+                    await queue.put({"type": "error", "message": str(e)})
+
+            # Jalankan graph di background
+            graph_task = asyncio.create_task(run_graph())
+
+            while True:
+                try:
+                    # Tunggu maksimal 10 detik untuk pesan dari graph
+                    msg = await asyncio.wait_for(queue.get(), timeout=10.0)
+                    
+                    if msg["type"] == "done":
+                        break
+                    elif msg["type"] == "error":
+                        raise RuntimeError(msg["message"])
+                    elif msg["type"] == "agent":
+                        yield f"data: {json.dumps(msg)}\n\n"
+                        
+                except asyncio.TimeoutError:
+                    # Sudah 10 detik tidak ada aktivitas (misal Researcher butuh 100s)
+                    # Kirim heartbeat agar koneksi Proxy Next.js tidak terputus (Timeout)
+                    logger.info("[Query] Mengirim heartbeat ke frontend...")
+                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+
             elapsed_ms = int((time.time() - start_time) * 1000)
-            
-            # Log query to DB
+
+            # Log query
             try:
                 await log_query(
-                    query=body.query,
-                    intent=current_state.get("intent", ""),
+                    query=body.query, intent=current_state.get("intent", ""),
                     agents_activated=current_state.get("agents_to_activate", []),
-                    latency_ms=elapsed_ms,
-                    confidence_score=current_state.get("confidence_score", 0),
+                    latency_ms=elapsed_ms, confidence_score=current_state.get("confidence_score", 0),
                     reflection_count=current_state.get("reflection_count", 0),
-                    model_used=settings.REASONING_MODEL,
+                    model_used=settings.GROQ_MODEL_REASONING,
                 )
             except Exception as e:
-                logger.warning("Gagal log query ke Supabase: %s", e)
+                logger.warning("Gagal log query: %s", e)
 
-            # Save to conversations
+            # Save conversation
             try:
-                client = get_supabase_client()
-                conv_result = client.table("conversations").select("id").eq("session_id", body.session_id).execute()
-                if conv_result.data:
-                    conversation_id = conv_result.data[0]["id"]
+                title = body.query[:60] + ("..." if len(body.query) > 60 else "")
+
+                # Check if conversation exists
+                conv = await fetch_one(
+                    "SELECT id FROM conversations WHERE session_id = $1",
+                    body.session_id,
+                )
+
+                if conv:
+                    conversation_id = str(conv["id"])
                 else:
-                    title = body.query[:60] + ("..." if len(body.query) > 60 else "")
-                    conv_insert = client.table("conversations").insert({
-                        "session_id": body.session_id,
-                        "user_id": user["id"],
-                        "title": title,
-                    }).execute()
-                    conversation_id = conv_insert.data[0]["id"]
+                    conv = await fetch_one(
+                        "INSERT INTO conversations (session_id, user_id, title) VALUES ($1, $2, $3) RETURNING id",
+                        body.session_id, str(user["id"]), title,
+                    )
+                    conversation_id = str(conv["id"])
 
                 await save_message(conversation_id=conversation_id, role="user", content=body.query)
                 await save_message(
-                    conversation_id=conversation_id,
-                    role="assistant",
+                    conversation_id=conversation_id, role="assistant",
                     content=current_state.get("final_answer", ""),
                     citations=current_state.get("citations", []),
                     confidence_score=current_state.get("confidence_score", 0),
                     action_items=current_state.get("action_items", []),
-                    latency_ms=elapsed_ms,
-                    model_used=settings.REASONING_MODEL,
+                    latency_ms=elapsed_ms, model_used=settings.GROQ_MODEL_REASONING,
                 )
             except Exception as e:
                 logger.warning("Gagal menyimpan pesan ke DB: %s", e)
 
-            # Yield final result
             final_answer = current_state.get("final_answer") or "Maaf, gagal memproses pertanyaan."
             final_response = {
-                "type": "result",
-                "answer": final_answer,
+                "type": "result", "answer": final_answer,
                 "citations": current_state.get("citations", []),
                 "action_items": current_state.get("action_items", []),
                 "confidence_score": current_state.get("confidence_score", 0),
                 "intent": current_state.get("intent", ""),
                 "reflection_count": current_state.get("reflection_count", 0),
-                "latency_ms": elapsed_ms,
-                "session_id": body.session_id,
+                "latency_ms": elapsed_ms, "session_id": body.session_id,
             }
             yield f"data: {json.dumps(final_response)}\n\n"
-            
+
         except Exception as e:
             logger.exception("[Query API] Error: %s", e)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        }
+        event_generator(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )

@@ -57,3 +57,23 @@ docker-compose.override.yml
 # Misc
 *.tmp
 *.bak
+
+# ============================================
+# Project-specific
+# ============================================
+
+# Test PDF files (JANGAN commit test data)
+*.pdf
+
+# Debug/test scripts (dibuat saat development)
+backend/test_*.py
+backend/diag_test.py
+backend/test_debug_pipeline.py
+backend/test_hybrid_extractor.py
+backend/test_pipeline.py
+
+# User uploads
+backend/uploads/
+
+# Chroma local (jika persist ke disk)
+backend/chroma_db/

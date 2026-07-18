@@ -24,6 +24,7 @@ Usage:
 
 import logging
 import time
+import asyncio
 
 from langgraph.graph import END, StateGraph
 
@@ -120,7 +121,7 @@ def build_agent_graph() -> StateGraph:
 
 def _timed_node(func, name: str):
     """Wrapper: catat elapsed time per node, enforce deadline via query_deadline."""
-    def wrapper(state: GraphState):
+    async def wrapper(state: GraphState):
         t0 = time.time()
         deadline = state.get("query_deadline", 0)
         if deadline and time.time() > deadline:
@@ -134,10 +135,37 @@ def _timed_node(func, name: str):
                     "yang lebih spesifik."
                 ),
             }
-        result = func(state)
-        elapsed = time.time() - t0
-        logger.info("[%s] Selesai dalam %.2fs", name, elapsed)
-        return result
+        remaining = (deadline - time.time()) if deadline else settings.QUERY_TIMEOUT_SECONDS
+        logger.info("[%s] Memulai... (deadline=%.0fs remaining)", name, remaining)
+        # Jalankan di thread pool dengan timeout enforcement
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(func, state),
+                timeout=max(remaining, 10),  # minimal 10s grace period
+            )
+            elapsed = time.time() - t0
+            logger.info("[%s] Selesai dalam %.2fs", name, elapsed)
+            return result
+        except asyncio.TimeoutError:
+            elapsed = time.time() - t0
+            logger.warning("[%s] TIMEOUT setelah %.2fs (deadline=%.0fs)", name, elapsed, remaining)
+            return {
+                **state,
+                "error": f"{name} timeout setelah {elapsed:.0f}s",
+                "final_answer": (
+                    "Maaf, pemrosesan pertanyaan Anda memakan waktu terlalu lama "
+                    f"({name} timeout setelah {elapsed:.0f}s). "
+                    "Silakan coba lagi dengan pertanyaan yang lebih spesifik."
+                ),
+            }
+        except Exception as e:
+            elapsed = time.time() - t0
+            logger.exception("[%s] ERROR setelah %.2fs: %s", name, elapsed, e)
+            return {
+                **state,
+                "error": f"{name} error: {str(e)}",
+                "final_answer": f"Maaf, terjadi kesalahan di {name}: {str(e)}",
+            }
     return wrapper
 
 

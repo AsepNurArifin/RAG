@@ -25,6 +25,13 @@ export function DocumentTable({ refreshTrigger }: { refreshTrigger: number }) {
 
   useEffect(() => {
     loadDocs();
+    
+    // Auto-refresh dimatikan sesuai permintaan
+    // const interval = setInterval(() => {
+    //   loadDocs();
+    // }, 5000);
+    
+    // return () => clearInterval(interval);
   }, [refreshTrigger]);
 
   const handleDelete = async (id: string, filename: string) => {
@@ -85,7 +92,7 @@ export function DocumentTable({ refreshTrigger }: { refreshTrigger: number }) {
       </div>
 
       {/* Desktop Table */}
-      <div className="hidden md:block border border-slate-200 rounded-lg overflow-hidden bg-[#e6f0fa]">
+      <div className="hidden md:block border border-slate-200 rounded-lg overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <Table className="w-full">
             <TableHeader className="bg-[#0077ff]/5">
@@ -124,7 +131,7 @@ export function DocumentTable({ refreshTrigger }: { refreshTrigger: number }) {
                     <TableCell className="text-slate-600 px-4">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{new Date(doc.upload_date).toLocaleDateString("id-ID")}</span>
+                        <span>{new Date(doc.created_at).toLocaleDateString("id-ID")}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right px-4">

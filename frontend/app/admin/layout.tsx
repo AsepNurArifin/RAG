@@ -12,12 +12,12 @@ export default function AdminLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="bg-[#F2C300] min-h-screen flex w-full overflow-hidden">
+    <div className="bg-[#f8fafc] min-h-screen flex w-full overflow-hidden">
       <SideNavBar onToggleSidebar={setIsSidebarOpen} isSidebarOpen={isSidebarOpen} />
-      <div className="flex-grow md:ml-[280px] md:mr-[64px] pt-16 md:pt-8 p-4 md:p-8 min-h-screen overflow-y-auto">
+      <div className="flex-grow md:ml-[280px] pt-16 md:pt-8 p-4 md:p-8 min-h-screen overflow-y-auto relative">
         {children}
+        <ProcessRail />
       </div>
-      <ProcessRail />
     </div>
   );
 }

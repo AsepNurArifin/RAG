@@ -1,21 +1,22 @@
 """
 Document Chunker — EnterpriseMind AI.
 
-Memecah teks dokumen menjadi chunk semantik/hierarkis untuk embedding.
-Menggunakan RecursiveCharacterTextSplitter dengan separator hierarkis
-(heading → paragraph → sentence → word) + overlap untuk menjaga konteks.
+Parent-Child Chunking Strategy:
+- Parent chunks (2000 chars): Konteks besar untuk LLM
+- Child chunks (500 chars): Unit kecil untuk embedding dan retrieval
 
-Ref: FR1.3 di SRS_PRD.md — BUKAN fixed-size naive split.
+Flow:
+1. Split dokumen jadi parent chunks (2000 chars, overlap 400)
+2. Split setiap parent jadi child chunks (500 chars, overlap 100)
+3. Embed HANYA child chunks ke Chroma
+4. Simpan parent chunks di storage (Chroma metadata / PostgreSQL)
+5. Saat retrieval: ambil child → resolve parent → kirim parent ke LLM
 
-Usage:
-    from app.ingestion.chunker import chunk_document
-
-    chunks = chunk_document(
-        text="...",
-        metadata={"filename": "SOP_Cuti.pdf", "category": "HR"}
-    )
+Hash-based Deduplication:
+- SHA-256 hash pada teks yang dinormalisasi
+- O(1) lookup untuk dedup di PostgreSQL
 """
-
+import hashlib
 import logging
 from dataclasses import dataclass
 
@@ -25,83 +26,147 @@ logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------ #
-# Chunk Data Class
+# Hash-based Deduplication Helpers
 # ------------------------------------------------------------------ #
 
+def normalize_for_hash(text: str) -> str:
+    """Normalisasi teks untuk hash: lowercase + hilangkan whitespace berlebih."""
+    return " ".join(text.lower().split())
+
+
+def content_hash(text: str) -> str:
+    """Generate SHA-256 hash dari teks yang sudah dinormalisasi."""
+    normalized = normalize_for_hash(text)
+    return hashlib.sha256(normalized.encode()).hexdigest()
+
+
+# ------------------------------------------------------------------ #
+# Data Structures
+# ------------------------------------------------------------------ #
 
 @dataclass
 class DocumentChunk:
-    """Representasi satu chunk dokumen dengan metadata."""
-
     content: str
-    """Teks isi chunk."""
-
     metadata: dict
-    """Metadata: filename, category, chunk_index, total_chunks, dsb."""
-
     chunk_index: int
-    """Indeks chunk dalam dokumen (0-based)."""
 
 
-# ------------------------------------------------------------------ #
-# Default Chunking Config
-# ------------------------------------------------------------------ #
-
-DEFAULT_CHUNK_SIZE = 1000
-"""Ukuran target per chunk (karakter). Disesuaikan agar cukup konteks
-untuk LLM tanpa terlalu panjang untuk embedding."""
-
-DEFAULT_CHUNK_OVERLAP = 200
-"""Overlap antar chunk untuk menjaga konteks di batas chunk."""
-
+# Hierarchical separators
 SEPARATORS = [
-    "\n## ",       # Heading level 2 (markdown)
-    "\n### ",      # Heading level 3
-    "\n#### ",     # Heading level 4
-    "\n\n",        # Paragraf baru
-    "\n",          # Baris baru
-    ". ",          # Kalimat (titik + spasi)
-    "? ",          # Kalimat tanya
-    "! ",          # Kalimat seru
-    "; ",          # Semicolon
-    ", ",          # Koma
-    " ",           # Kata
-    "",            # Karakter (fallback terakhir)
+    "\n## ",
+    "\n### ",
+    "\n#### ",
+    "\n\n",
+    "\n",
+    ". ",
+    "? ",
+    "! ",
+    "; ",
+    ", ",
+    " ",
+    "",
 ]
-"""Separator hierarkis — prioritas split dari level tertinggi
-(heading) ke terendah (karakter). Ini yang membedakan dari naive
-fixed-size split."""
+
+# Chunk sizes
+PARENT_CHUNK_SIZE = 2000
+PARENT_CHUNK_OVERLAP = 400
+CHILD_CHUNK_SIZE = 500
+CHILD_CHUNK_OVERLAP = 100
 
 
 # ------------------------------------------------------------------ #
-# Chunking Function
+# Page-Aware Chunking (untuk Hybrid PDF Extraction)
 # ------------------------------------------------------------------ #
 
+def chunk_pages(
+    pages: list,
+    base_metadata: dict,
+) -> tuple[list[DocumentChunk], list[DocumentChunk]]:
+    """
+    Chunk List[PageExtraction] menjadi parent-child chunks.
+    
+    Setiap chunk mendapatkan metadata:
+    - page_number: nomor halaman asal
+    - extraction_method: metode ekstraksi (pymupdf4llm/vlm_docling)
+    - content_hash: SHA-256 hash untuk deduplication
+    
+    Args:
+        pages: List[PageExtraction] dari extractor
+        base_metadata: Metadata dasar (filename, document_id, dll)
+    
+    Returns:
+        (parent_chunks, child_chunks)
+    """
+    from app.ingestion.extractor import PageExtraction, flatten_pages
+
+    if not pages:
+        raise ValueError("Tidak ada halaman untuk di-chunk.")
+
+    all_parent_chunks: list[DocumentChunk] = []
+    all_child_chunks: list[DocumentChunk] = []
+
+    for page in pages:
+        text = page.get("text", "").strip()
+        if not text:
+            continue
+
+        page_number = page.get("page_number", 0)
+        extraction_method = page.get("extraction_method", "unknown")
+
+        # Metadata khusus halaman — page_number di metadata agar unik
+        page_metadata = {
+            **base_metadata,
+            "page_number": page_number,
+            "extraction_method": extraction_method,
+        }
+
+        # Chunk halaman ini
+        parent_chunks, child_chunks = chunk_document_parent_child(
+            text=text,
+            metadata=page_metadata,
+        )
+
+        # Buat parent IDs unik per halaman (prefix dengan page_number)
+        # Tanpa ini: page 1 "file__parent_0", page 2 "file__parent_0" → BENTROK
+        for pc in parent_chunks:
+            old_pid = pc.metadata["parent_id"]
+            pc.metadata["parent_id"] = f"p{page_number}_{old_pid}"
+            # Update semua child yang merujuk ke parent ini
+            for cc in child_chunks:
+                if cc.metadata.get("parent_id") == old_pid:
+                    cc.metadata["parent_id"] = pc.metadata["parent_id"]
+                    cc.metadata["child_id"] = f"{pc.metadata['parent_id']}__child_{cc.metadata.get('chunk_index', 0)}"
+
+        all_parent_chunks.extend(parent_chunks)
+        all_child_chunks.extend(child_chunks)
+
+    # Hitung content hash untuk setiap chunk (untuk dedup)
+    for chunk in all_parent_chunks:
+        chunk.metadata["content_hash"] = content_hash(chunk.content)
+    for chunk in all_child_chunks:
+        chunk.metadata["content_hash"] = content_hash(chunk.content)
+
+    logger.info(
+        "Page-aware chunking selesai: pages=%d, parents=%d, children=%d",
+        len(pages), len(all_parent_chunks), len(all_child_chunks),
+    )
+
+    return all_parent_chunks, all_child_chunks
+
+
+# ------------------------------------------------------------------ #
+# Standard Chunking (backward compatibility)
+# ------------------------------------------------------------------ #
 
 def chunk_document(
     text: str,
     metadata: dict,
-    chunk_size: int = DEFAULT_CHUNK_SIZE,
-    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+    chunk_size: int = CHILD_CHUNK_SIZE,
+    chunk_overlap: int = CHILD_CHUNK_OVERLAP,
 ) -> list[DocumentChunk]:
     """
-    Pecah teks dokumen menjadi chunk semantik.
-
-    Args:
-        text: Teks hasil ekstraksi dokumen.
-        metadata: Metadata dokumen (filename, category, dsb.).
-                  Akan disalin ke setiap chunk.
-        chunk_size: Ukuran target per chunk dalam karakter.
-        chunk_overlap: Jumlah karakter overlap antar chunk.
-
-    Returns:
-        List DocumentChunk, masing-masing punya content dan metadata.
-
-    Raises:
-        ValueError: Jika teks kosong.
-
-    Side effects:
-        Tidak ada — pure function.
+    Split text into child chunks (untuk backward compatibility).
+    Gunakan chunk_document_parent_child() untuk parent-child strategy.
     """
     if not text or not text.strip():
         raise ValueError("Teks dokumen kosong, tidak bisa di-chunk.")
@@ -115,7 +180,6 @@ def chunk_document(
     )
 
     raw_chunks = splitter.split_text(text)
-
     chunks = []
     for i, content in enumerate(raw_chunks):
         chunk_metadata = {
@@ -123,21 +187,109 @@ def chunk_document(
             "chunk_index": i,
             "total_chunks": len(raw_chunks),
             "chunk_size": len(content),
+            "content_hash": content_hash(content),
         }
         chunks.append(
-            DocumentChunk(
-                content=content,
-                metadata=chunk_metadata,
-                chunk_index=i,
-            )
+            DocumentChunk(content=content, metadata=chunk_metadata, chunk_index=i)
         )
 
     logger.info(
-        "Chunking selesai: filename=%s, total_chunks=%d, "
-        "avg_chunk_size=%d chars",
+        "Chunking selesai: filename=%s, total_chunks=%d, avg_chunk_size=%d chars",
         metadata.get("filename", "unknown"),
         len(chunks),
         sum(len(c.content) for c in chunks) // max(len(chunks), 1),
     )
-
     return chunks
+
+
+def chunk_document_parent_child(
+    text: str,
+    metadata: dict,
+) -> tuple[list[DocumentChunk], list[DocumentChunk]]:
+    """
+    Parent-Child chunking strategy.
+
+    Returns: (parent_chunks, child_chunks)
+    - parent_chunks: Untuk konteks LLM (2000 chars)
+    - child_chunks: Untuk embedding dan retrieval (500 chars)
+    """
+    if not text or not text.strip():
+        raise ValueError("Teks dokumen kosong, tidak bisa di-chunk.")
+
+    filename = metadata.get("filename", "unknown")
+
+    page_number = metadata.get("page_number")
+    page_prefix = f"page_{page_number}__" if page_number is not None else ""
+
+    # Step 1: Split jadi parent chunks
+    parent_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=PARENT_CHUNK_SIZE,
+        chunk_overlap=PARENT_CHUNK_OVERLAP,
+        separators=SEPARATORS,
+        length_function=len,
+        is_separator_regex=False,
+    )
+    parent_texts = parent_splitter.split_text(text)
+
+    parent_chunks = []
+    child_chunks = []
+
+    for parent_idx, parent_text in enumerate(parent_texts):
+        parent_id = f"{filename}__{page_prefix}parent_{parent_idx}"
+
+        # Buat parent chunk
+        parent_metadata = {
+            **metadata,
+            "chunk_type": "parent",
+            "parent_id": parent_id,
+            "chunk_index": parent_idx,
+            "total_chunks": len(parent_texts),
+            "chunk_size": len(parent_text),
+            "content_hash": content_hash(parent_text),
+        }
+        parent_chunks.append(
+            DocumentChunk(
+                content=parent_text,
+                metadata=parent_metadata,
+                chunk_index=parent_idx,
+            )
+        )
+
+        # Step 2: Split parent jadi child chunks
+        child_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=CHILD_CHUNK_SIZE,
+            chunk_overlap=CHILD_CHUNK_OVERLAP,
+            separators=SEPARATORS,
+            length_function=len,
+            is_separator_regex=False,
+        )
+        child_texts = child_splitter.split_text(parent_text)
+
+        for child_idx, child_text in enumerate(child_texts):
+            child_id = f"{parent_id}__child_{child_idx}"
+            child_metadata = {
+                **metadata,
+                "chunk_type": "child",
+                "parent_id": parent_id,
+                "child_id": child_id,
+                "chunk_index": child_idx,
+                "total_chunks": len(child_texts),
+                "chunk_size": len(child_text),
+                "content_hash": content_hash(child_text),
+            }
+            child_chunks.append(
+                DocumentChunk(
+                    content=child_text,
+                    metadata=child_metadata,
+                    chunk_index=child_idx,
+                )
+            )
+
+    logger.info(
+        "Parent-Child chunking: filename=%s, parents=%d, children=%d",
+        filename,
+        len(parent_chunks),
+        len(child_chunks),
+    )
+
+    return parent_chunks, child_chunks

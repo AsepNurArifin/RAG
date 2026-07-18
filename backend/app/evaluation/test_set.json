@@ -1,0 +1,902 @@
+[
+  {
+    "id": 1,
+    "query": "Apa itu kearifan lokal?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["pengetahuan tradisional", "adat istiadat", "sistem nilai"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "easy"
+  },
+  {
+    "id": 2,
+    "query": "Apa itu sistem Subak?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["Bali", "Tri Hita Karana", "irigasi", "sawah"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "easy"
+  },
+  {
+    "id": 3,
+    "query": "Apa itu tradisi Sasi?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["Maluku", "konservasi", "sumber daya alam", "larangan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "easy"
+  },
+  {
+    "id": 4,
+    "query": "Siapa yang menjalankan tradisi Sasi di Maluku?",
+    "query_type": "factual",
+    "subcategory": "entity",
+    "expected_answer_contains": ["masyarakat", "adat", "komunitas lokal"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 5,
+    "query": "Di mana sistem Subak diterapkan?",
+    "query_type": "factual",
+    "subcategory": "location",
+    "expected_answer_contains": ["Bali", "Indonesia"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "easy"
+  },
+  {
+    "id": 6,
+    "query": "Apa konsep Tri Hita Karana?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["hubungan", "manusia", "alam", "Tuhan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 7,
+    "query": "Apa itu Lembaga Kewang?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["Maluku", "lingkungan", "pelestarian", "hutan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 8,
+    "query": "Apa itu pola tanam Tumpang Sari?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["pertanian", "tanaman", "bersamaan", "tradisional"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 9,
+    "query": "Apa itu Sedekah Bumi?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["tradisi", "syukur", "hasil bumi", "masyarakat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 10,
+    "query": "Apa itu hukum adat Indonesia?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["tidak tertulis", "masyarakat", "ditaati", "tradisional"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "easy"
+  },
+  {
+    "id": 11,
+    "query": "Apa hubungan kearifan lokal dengan mitigasi bencana?",
+    "query_type": "factual",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["bencana alam", "mengurangi dampak", "tradisional"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 12,
+    "query": "Apa peran kearifan lokal dalam pengembangan IPTEK?",
+    "query_type": "factual",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["ilmu pengetahuan", "teknologi", "sumber daya manusia"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 13,
+    "query": "Apa itu tradisi Tedak Siten?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["tradisi", "anak", "turun tanah", "Jawa"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 14,
+    "query": "Apa itu tradisi Manten Mubeng Gapura?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["Desa Loram Kulon", "tradisi", "pernikahan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 15,
+    "query": "Apa itu kerukunan beragama di komunitas Tengger?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["Malang", "agama", "kerukunan", "komunitas"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 16,
+    "query": "Apa yang dimaksud dengan pamali dalam kearifan lokal?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["pantangan", "larangan", "kepercayaan", "masyarakat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 17,
+    "query": "Bagaimana kearifan lokal diwariskan?",
+    "query_type": "factual",
+    "subcategory": "process",
+    "expected_answer_contains": ["turun-temurun", "tradisi lisan", "cerita rakyat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "easy"
+  },
+  {
+    "id": 18,
+    "query": "Apa peran kearifan lokal dalam pelestarian lingkungan?",
+    "query_type": "factual",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["lingkungan", "lestari", "konservasi", "alam"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 19,
+    "query": "Apa tantangan kearifan lokal saat ini?",
+    "query_type": "factual",
+    "subcategory": "analysis",
+    "expected_answer_contains": ["modernisasi", "globalisasi", "hilang", "tantangan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 20,
+    "query": "Apa hubungan kearifan lokal dengan pariwisata?",
+    "query_type": "factual",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["pariwisata", "daya tarik", "budaya", "wisatawan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 21,
+    "query": "Apa itu Sasi Laut?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["laut", "larangan", "menangkap ikan", "konservasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 22,
+    "query": "Di mana tradisi Sasi diterapkan selain Maluku?",
+    "query_type": "factual",
+    "subcategory": "location",
+    "expected_answer_contains": ["Raja Ampat", "Papua"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 23,
+    "query": "Apa itu Nyadran?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["Sedekah Bumi", "tradisi", "syukur", "Jawa"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 24,
+    "query": "Apa perbedaan kearifan lokal dan budaya?",
+    "query_type": "factual",
+    "subcategory": "comparison",
+    "expected_answer_contains": ["kearifan", "budaya", "lokal", "tradisional"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 25,
+    "query": "Apa nilai-nilai yang terkandung dalam kearifan lokal?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["nilai", "norma", "etika", "moral"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 26,
+    "query": "Apa itu pengobatan tradisional dalam konteks kearifan lokal?",
+    "query_type": "factual",
+    "subcategory": "definition",
+    "expected_answer_contains": ["tradisional", "herbal", "obat", "warisan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 27,
+    "query": "Apa peran perempuan dalam kearifan lokal?",
+    "query_type": "factual",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["perempuan", "peran", "masyarakat", "tradisional"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 28,
+    "query": "Apa hubungan kearifan lokal dengan pembangunan berkelanjutan?",
+    "query_type": "factual",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["berkelanjutan", "pembangunan", "lingkungan", "SDGs"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 29,
+    "query": "Apa contoh kearifan lokal dalam pengelolaan air?",
+    "query_type": "factual",
+    "subcategory": "example",
+    "expected_answer_contains": ["Subak", "irigasi", "air", "sawah"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 30,
+    "query": "Apa peran adat istiadat dalam kearifan lokal?",
+    "query_type": "factual",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["adat", "istiadat", "norma", "masyarakat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 31,
+    "query": "Sebutkan semua contoh kearifan lokal yang disebutkan dalam dokumen",
+    "query_type": "comprehensive",
+    "subcategory": "exhaustive",
+    "expected_answer_contains": ["Subak", "Sasi", "Tumpang Sari", "Sedekah Bumi", "Lembaga Kewang"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 32,
+    "query": "Apa saja bentuk-bentuk kearifan lokal?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["pengetahuan", "praktik spiritual", "sistem nilai", "adat istiadat", "seni"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 33,
+    "query": "Daftar seluruh tradisi kearifan lokal di Indonesia yang disebutkan",
+    "query_type": "comprehensive",
+    "subcategory": "exhaustive",
+    "expected_answer_contains": ["Subak", "Sasi", "Tedak Siten", "Manten Mubeng Gapura", "Nyadran"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 34,
+    "query": "Sebutkan semua daerah di Indonesia yang memiliki kearifan lokal",
+    "query_type": "comprehensive",
+    "subcategory": "exhaustive",
+    "expected_answer_contains": ["Bali", "Maluku", "Jawa", "Raja Ampat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 35,
+    "query": "Apa saja yang termasuk dalam kategori pantangan atau pamali?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["makanan", "interaksi sosial", "adat istiadat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 36,
+    "query": "Sebutkan semua aspek kehidupan yang dipengaruhi kearifan lokal",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["pertanian", "perikanan", "lingkungan", "sosial", "spiritual"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 37,
+    "query": "Apa saja fungsi kearifan lokal dalam masyarakat?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["konservasi", "sosial", "ekonomi", "spiritual", "budaya"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 38,
+    "query": "Sebutkan contoh kearifan lokal di bidang pertanian",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["Tumpang Sari", "Subak", "pola tanam"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 39,
+    "query": "Sebutkan contoh kearifan lokal di bidang perikanan dan kelautan",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["Sasi Laut", "konservasi", "larangan menangkap"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 40,
+    "query": "Apa saja nilai-nilai luhur dalam kearifan lokal Indonesia?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["gotong royong", "kerukunan", "harmoni", "kebersamaan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 41,
+    "query": "Sebutkan semua bentuk seni yang merupakan kearifan lokal",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["tari", "musik", "kerajinan", "seni pertunjukan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 42,
+    "query": "Apa saja contoh kearifan lokal dalam pengelolaan hutan?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["Lembaga Kewang", "hutan adat", "larangan menebang"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 43,
+    "query": "Sebutkan tradisi-tradisi kearifan lokal yang berkaitan dengan makanan",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["pantangan makanan", "diet tradisional", "makanan khas"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 44,
+    "query": "Apa saja bentuk kearifan lokal yang berkaitan dengan pernikahan?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["Manten Mubeng Gapura", "pernikahan adat", "tradisi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 45,
+    "query": "Sebutkan semua contoh kearifan lokal yang berkaitan dengan kehidupan anak",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["Tedak Siten", "turun tanah", "anak"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 46,
+    "query": "Apa saja kearifan lokal yang berkaitan dengan keagamaan?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["kerukunan beragama", "Tengger", "spiritual"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 47,
+    "query": "Sebutkan semua kearifan lokal yang berfungsi sebagai konservasi alam",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["Sasi", "Lembaga Kewang", "Subak", "konservasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 48,
+    "query": "Apa saja bentuk kearifan lokal di bidang ekonomi?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["gotong royong", "ekonomi komunal", "pasar tradisional"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 49,
+    "query": "Sebutkan semua contoh kearifan lokal yang berkaitan dengan pengobatan",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["jamu", "herbal", "pengobatan tradisional"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 50,
+    "query": "Apa saja kearifan lokal yang berkaitan dengan sistem pemerintahan adat?",
+    "query_type": "comprehensive",
+    "subcategory": "category",
+    "expected_answer_contains": ["hukum adat", "pemerintahan adat", "musyawarah"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 51,
+    "query": "Bandingkan sistem Subak di Bali dengan tradisi Sasi di Maluku",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["Bali", "Maluku", "irigasi", "konservasi", "perbedaan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 52,
+    "query": "Apa perbedaan kearifan lokal di Jawa dan Bali?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["Jawa", "Bali", "perbedaan", "budaya"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 53,
+    "query": "Apa persamaan antara Sedekah Bumi dan tradisi Sasi?",
+    "query_type": "comparison",
+    "subcategory": "similarity",
+    "expected_answer_contains": ["syukur", "konservasi", "masyarakat", "tradisi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 54,
+    "query": "Bandingkan hukum adat dengan hukum modern di Indonesia",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["adat", "modern", "tertulis", "tidak tertulis"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 55,
+    "query": "Apa perbedaan kearifan lokal dan pengetahuan modern?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["tradisional", "modern", "ilmiah", "turun-temurun"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 56,
+    "query": "Bandingkan kearifan lokal di bidang pertanian dan perikanan",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["pertanian", "perikanan", "Tumpang Sari", "Sasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 57,
+    "query": "Apa perbedaan pamali di berbagai daerah Indonesia?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["pantangan", "daerah", "perbedaan", "kepercayaan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 58,
+    "query": "Bandingkan kearifan lokal Indonesia dengan negara lain di Asia Tenggara",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["Indonesia", "Asia Tenggara", "perbedaan", "persamaan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 59,
+    "query": "Apa perbedaan kearifan lokal perkotaan dan pedesaan?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["kota", "desa", "perbedaan", "modernisasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 60,
+    "query": "Bandingkan sistem kekerabatan matrilineal dan patrilineal dalam kearifan lokal",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["matrilineal", "patrilineal", "kekerabatan", "garis keturunan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 61,
+    "query": "Apa perbedaan kearifan lokal yang bersifat sakral dan sekuler?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["sakral", "sekuler", "spiritual", "duniawi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 62,
+    "query": "Bandingkan kearifan lokal dalam pengelolaan air dan pengelolaan hutan",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["air", "hutan", "Subak", "Kewang"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 63,
+    "query": "Apa perbedaan kearifan lokal yang diwariskan secara lisan dan tertulis?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["lisan", "tertulis", "tradisi", "dokumentasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 64,
+    "query": "Bandingkan peran adat istiadat di Sumatera dan Kalimantan",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["Sumatera", "Kalimantan", "adat", "perbedaan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 65,
+    "query": "Apa perbedaan kearifan lokal yang bersifat individual dan komunal?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["individual", "komunal", "masyarakat", "pribadi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 66,
+    "query": "Bandingkan kearifan lokal di bidang seni dan di bidang pertanian",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["seni", "pertanian", "budaya", "produksi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 67,
+    "query": "Apa perbedaan kearifan lokal yang sudah terdokumentasi dan yang belum?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["terdokumentasi", "belum", "hilang", "preservasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 68,
+    "query": "Bandingkan kearifan lokal dalam konteks urban dan rural",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["urban", "rural", "kota", "desa"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 69,
+    "query": "Apa perbedaan kearifan lokal yang bersifat tetap dan yang berubah?",
+    "query_type": "comparison",
+    "subcategory": "difference",
+    "expected_answer_contains": ["tetap", "berubah", "dinamis", "statis"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 70,
+    "query": "Bandingkan kearifan lokal Indonesia sebelum dan sesudah kemerdekaan",
+    "query_type": "comparison",
+    "subcategory": "direct",
+    "expected_answer_contains": ["sebelum", "sesudah", "kemerdekaan", "perubahan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 71,
+    "query": "Bagaimana cara menerapkan sistem Subak di Bali?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["Subak", "irigasi", "sawah", "petani", "aturan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 72,
+    "query": "Langkah-langkah melestarikan kearifan lokal di masyarakat",
+    "query_type": "procedural",
+    "subcategory": "steps",
+    "expected_answer_contains": ["dokumentasi", "edukasi", "partisipasi", "pemerintah"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 73,
+    "query": "Bagaimana proses pelaksanaan tradisi Sasi?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["Sasi", "larangan", "periode", "pencabutan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 74,
+    "query": "Bagaimana cara mengajarkan kearifan lokal kepada generasi muda?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["pendidikan", "sekolah", "keluarga", "masyarakat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 75,
+    "query": "Prosedur pengakuan hukum adat oleh pemerintah",
+    "query_type": "procedural",
+    "subcategory": "sop",
+    "expected_answer_contains": ["pemerintah", "pengakuan", "hukum adat", "undang-undang"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 76,
+    "query": "Bagaimana cara mendokumentasikan kearifan lokal yang akan hilang?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["dokumentasi", "wawancara", "penelitian", "arsip"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 77,
+    "query": "Langkah-langkah menerapkan pola tanam Tumpang Sari",
+    "query_type": "procedural",
+    "subcategory": "steps",
+    "expected_answer_contains": ["Tumpang Sari", "tanaman", "lahan", "musim"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 78,
+    "query": "Bagaimana proses pelaksanaan Sedekah Bumi?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["Sedekah Bumi", "syukur", "ritual", "masyarakat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 79,
+    "query": "Bagaimana cara mengintegrasikan kearifan lokal dalam kurikulum pendidikan?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["kurikulum", "pendidikan", "sekolah", "mata pelajaran"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 80,
+    "query": "Prosedur pelaksanaan tradisi Tedak Siten",
+    "query_type": "procedural",
+    "subcategory": "sop",
+    "expected_answer_contains": ["Tedak Siten", "anak", "turun tanah", "ritual"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 81,
+    "query": "Bagaimana cara menjaga kelestarian Lembaga Kewang?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["Lembaga Kewang", "hutan", "pelestarian", "masyarakat adat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 82,
+    "query": "Langkah-langkah mengembangkan pariwisata berbasis kearifan lokal",
+    "query_type": "procedural",
+    "subcategory": "steps",
+    "expected_answer_contains": ["pariwisata", "kearifan lokal", "komunitas", "berkelanjutan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 83,
+    "query": "Bagaimana cara menerapkan kearifan lokal dalam pengelolaan sumber daya alam?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["sumber daya alam", "kelola", "lestari", "masyarakat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 84,
+    "query": "Prosedur pengobatan tradisional dengan herbal",
+    "query_type": "procedural",
+    "subcategory": "sop",
+    "expected_answer_contains": ["herbal", "obat", "tradisional", "tanaman"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 85,
+    "query": "Bagaimana cara menghidupkan kembali kearifan lokal yang sudah hilang?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["revitalisasi", "hidupkan kembali", "masyarakat", "budaya"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 86,
+    "query": "Langkah-langkah membuat kerajinan tangan tradisional",
+    "query_type": "procedural",
+    "subcategory": "steps",
+    "expected_answer_contains": ["kerajinan", "tangan", "tradisional", "bahan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 87,
+    "query": "Bagaimana proses musyawarah adat dalam pengambilan keputusan?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["musyawarah", "adat", "keputusan", "mufakat"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 88,
+    "query": "Bagaimana cara melindungi kearifan lokal dari klaim negara lain?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["perlindungan", "klaim", "hak cipta", "UNESCO"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 89,
+    "query": "Prosedur pelaksanaan upacara adat kematian",
+    "query_type": "procedural",
+    "subcategory": "sop",
+    "expected_answer_contains": ["upacara", "kematian", "adat", "ritual"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 90,
+    "query": "Bagaimana cara mengelola konflik berdasarkan hukum adat?",
+    "query_type": "procedural",
+    "subcategory": "how-to",
+    "expected_answer_contains": ["konflik", "hukum adat", "penyelesaian", "musyawarah"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 91,
+    "query": "Analisis peran kearifan lokal dalam pembangunan berkelanjutan Indonesia",
+    "query_type": "analytical",
+    "subcategory": "analysis",
+    "expected_answer_contains": ["berkelanjutan", "pembangunan", "peran", "kontribusi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 92,
+    "query": "Evaluasi efektivitas kearifan lokal dalam konservasi lingkungan",
+    "query_type": "analytical",
+    "subcategory": "analysis",
+    "expected_answer_contains": ["efektivitas", "konservasi", "lingkungan", "hasil"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 93,
+    "query": "Dampak globalisasi terhadap kearifan lokal di Indonesia",
+    "query_type": "analytical",
+    "subcategory": "impact",
+    "expected_answer_contains": ["globalisasi", "dampak", "hilang", "perubahan"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 94,
+    "query": "Hubungan antara kearifan lokal dan identitas nasional Indonesia",
+    "query_type": "analytical",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["identitas", "nasional", "Indonesia", "budaya"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 95,
+    "query": "Analisis tantangan dan peluang kearifan lokal di era digital",
+    "query_type": "analytical",
+    "subcategory": "analysis",
+    "expected_answer_contains": ["digital", "tantangan", "peluang", "teknologi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 96,
+    "query": "Evaluasi kebijakan pemerintah terhadap pelestarian kearifan lokal",
+    "query_type": "analytical",
+    "subcategory": "analysis",
+    "expected_answer_contains": ["kebijakan", "pemerintah", "pelestarian", "evaluasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 97,
+    "query": "Dampak kearifan lokal terhadap kesejahteraan masyarakat",
+    "query_type": "analytical",
+    "subcategory": "impact",
+    "expected_answer_contains": ["kesejahteraan", "masyarakat", "dampak", "ekonomi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 98,
+    "query": "Hubungan antara kearifan lokal dan keanekaragaman hayati Indonesia",
+    "query_type": "analytical",
+    "subcategory": "relationship",
+    "expected_answer_contains": ["keanekaragaman", "hayati", "konservasi", "alam"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 99,
+    "query": "Analisis potensi kearifan lokal sebagai solusi perubahan iklim",
+    "query_type": "analytical",
+    "subcategory": "analysis",
+    "expected_answer_contains": ["perubahan iklim", "solusi", "adaptasi", "mitigasi"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 100,
+    "query": "Evaluasi peran kearifan lokal dalam ketahanan pangan Indonesia",
+    "query_type": "analytical",
+    "subcategory": "analysis",
+    "expected_answer_contains": ["ketahanan pangan", "pertanian", "produksi", "swasembada"],
+    "expected_sources": ["564974-kearifan-lokal-local-wisdom-indonesia-4ca2930e.pdf"],
+    "difficulty": "hard"
+  }
+]

@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS documents (
     status TEXT DEFAULT 'pending' CHECK (
         status IN ('pending', 'processing', 'indexed', 'failed')
     ),
-    file_path TEXT,
+    storage_object_name TEXT,
     chunk_count INT DEFAULT 0,
     file_size_bytes BIGINT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),

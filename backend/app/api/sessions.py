@@ -8,13 +8,12 @@ Endpoints:
     GET    /api/sessions/{id}/messages — Ambil pesan dalam satu sesi
     DELETE /api/sessions/{id}          — Hapus sesi chat
 """
-
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import get_current_user
-from app.core.supabase_client import get_supabase_client
+from app.core.postgres_client import fetch_one, fetch_all, execute_query
 
 logger = logging.getLogger(__name__)
 
@@ -23,21 +22,14 @@ router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
 @router.get("")
 async def list_sessions(user: dict = Depends(get_current_user)):
+    """List semua sesi chat milik user yang login."""
+    query = """
+        SELECT id, session_id, title, created_at, updated_at
+        FROM conversations
+        WHERE user_id = $1
+        ORDER BY updated_at DESC
     """
-    List semua sesi chat milik user yang login.
-
-    Returns:
-        List sesi diurutkan berdasarkan updated_at terbaru.
-    """
-    client = get_supabase_client()
-    result = (
-        client.table("conversations")
-        .select("id, session_id, title, created_at, updated_at")
-        .eq("user_id", user["id"])
-        .order("updated_at", desc=True)
-        .execute()
-    )
-    return result.data
+    return await fetch_all(query, str(user["id"]))
 
 
 @router.get("/{session_id}/messages")
@@ -45,47 +37,41 @@ async def get_session_messages(
     session_id: str,
     user: dict = Depends(get_current_user),
 ):
-    """
-    Ambil semua pesan dalam satu sesi chat.
-
-    Args:
-        session_id: UUID atau session_id dari conversations.
-
-    Returns:
-        List pesan diurutkan berdasarkan created_at.
-
-    Raises:
-        HTTPException 404 jika sesi tidak ditemukan atau bukan milik user.
-    """
-    client = get_supabase_client()
-
+    """Ambil semua pesan dalam satu sesi chat."""
     # Verifikasi sesi milik user
-    conv = (
-        client.table("conversations")
-        .select("id")
-        .eq("session_id", session_id)
-        .eq("user_id", user["id"])
-        .execute()
+    conv = await fetch_one(
+        "SELECT id FROM conversations WHERE session_id = $1 AND user_id = $2",
+        session_id, str(user["id"]),
     )
 
-    if not conv.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sesi tidak ditemukan.",
-        )
+    if not conv:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesi tidak ditemukan.")
 
-    conversation_id = conv.data[0]["id"]
-
+    import json
     # Ambil semua pesan
-    result = (
-        client.table("messages")
-        .select("id, role, content, citations, confidence_score, action_items, latency_ms, created_at")
-        .eq("conversation_id", conversation_id)
-        .order("created_at", desc=False)
-        .execute()
-    )
-
-    return result.data
+    query = """
+        SELECT id, role, content, citations, confidence_score, action_items, latency_ms, created_at
+        FROM messages
+        WHERE conversation_id = $1
+        ORDER BY created_at ASC
+    """
+    rows = await fetch_all(query, str(conv["id"]))
+    
+    # asyncpg mengembalikan JSONB sebagai string, jadi kita perlu parse ke dict/list Python
+    for row in rows:
+        if isinstance(row.get("citations"), str):
+            try:
+                row["citations"] = json.loads(row["citations"])
+            except Exception:
+                row["citations"] = []
+                
+        if isinstance(row.get("action_items"), str):
+            try:
+                row["action_items"] = json.loads(row["action_items"])
+            except Exception:
+                row["action_items"] = []
+                
+    return rows
 
 
 @router.delete("/{session_id}")
@@ -93,30 +79,15 @@ async def delete_session(
     session_id: str,
     user: dict = Depends(get_current_user),
 ):
-    """
-    Hapus sesi chat (beserta semua pesannya via CASCADE).
-
-    Raises:
-        HTTPException 404 jika sesi tidak ditemukan atau bukan milik user.
-    """
-    client = get_supabase_client()
-
-    # Verifikasi sesi milik user
-    conv = (
-        client.table("conversations")
-        .select("id")
-        .eq("session_id", session_id)
-        .eq("user_id", user["id"])
-        .execute()
+    """Hapus sesi chat (beserta semua pesannya via CASCADE)."""
+    conv = await fetch_one(
+        "SELECT id FROM conversations WHERE session_id = $1 AND user_id = $2",
+        session_id, str(user["id"]),
     )
 
-    if not conv.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sesi tidak ditemukan.",
-        )
+    if not conv:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesi tidak ditemukan.")
 
-    # Hapus (messages dihapus via CASCADE)
-    client.table("conversations").delete().eq("id", conv.data[0]["id"]).execute()
+    await execute_query("DELETE FROM conversations WHERE id = $1", str(conv["id"]))
     logger.info("Sesi dihapus: session_id=%s, user=%s", session_id, user["email"])
     return {"message": "Sesi berhasil dihapus."}

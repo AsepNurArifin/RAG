@@ -108,7 +108,7 @@ export default function UsersPage() {
 
   if (!isAdmin) {
     return (
-      <div className="p-8 min-h-screen flex items-center justify-center bg-[#F2C300]">
+      <div className="p-8 min-h-screen flex items-center justify-center bg-[#f8fafc]">
         <p className="text-slate-500 font-medium">Akses ditolak. Hanya admin yang dapat mengakses halaman ini.</p>
       </div>
     );
@@ -117,7 +117,7 @@ export default function UsersPage() {
   return (
     <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 md:px-8">
       {/* Header */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8"
@@ -156,11 +156,11 @@ export default function UsersPage() {
             </div>
           ) : (
             users.map((u) => (
-              <Card key={u.id} className="bg-[#e6f0fa] border-slate-200 shadow-sm">
+              <Card key={u.id} className="bg-white border-slate-200 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-[#0077ff]/10 flex items-center justify-center border border-[#0077ff]/20 shrink-0">
                         {u.role === "admin" ? (
                           <Shield className="w-5 h-5 text-[#0077ff]" />
                         ) : (
@@ -168,7 +168,7 @@ export default function UsersPage() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-950 text-sm truncate">{u.full_name}</p>
+                        <p className="font-semibold text-slate-900 text-sm truncate">{u.full_name}</p>
                         <p className="text-xs text-slate-500 truncate">{u.email}</p>
                       </div>
                     </div>
@@ -223,10 +223,10 @@ export default function UsersPage() {
         transition={{ delay: 0.1 }}
         className="hidden md:block"
       >
-        <Card className="shadow-sm border-slate-200 overflow-hidden bg-[#e6f0fa]">
-          <div className="overflow-x-auto bg-[#e6f0fa]">
-            <Table className="bg-[#e6f0fa]">
-              <TableHeader className="bg-[#0077ff]/5">
+        <Card className="shadow-sm border-slate-200 overflow-hidden bg-white">
+          <div className="overflow-x-auto bg-white">
+            <Table className="bg-white">
+              <TableHeader className="bg-[#f8fafc]">
                 <TableRow className="bg-transparent hover:bg-transparent border-b border-slate-200">
                   <TableHead className="font-semibold text-slate-700 px-4">Nama</TableHead>
                   <TableHead className="font-semibold text-slate-700 px-4">Email</TableHead>
@@ -236,7 +236,7 @@ export default function UsersPage() {
                   <TableHead className="font-semibold text-slate-700 text-right px-4">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="bg-[#e6f0fa]">
+              <TableBody className="bg-white">
                 {isLoading ? (
                   <TableRow className="bg-transparent hover:bg-transparent">
                     <TableCell colSpan={6} className="text-center py-12 text-slate-400 bg-transparent">
@@ -255,14 +255,14 @@ export default function UsersPage() {
                     <TableRow key={u.id} className="bg-transparent hover:bg-[#0077ff]/5 border-b border-slate-200/60 transition-colors">
                       <TableCell className="bg-transparent px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-[#0077ff]/10 flex items-center justify-center border border-[#0077ff]/20 shrink-0">
                             {u.role === "admin" ? (
                               <Shield className="w-4 h-4 text-[#0077ff]" />
                             ) : (
                               <User className="w-4 h-4 text-slate-500" />
                             )}
                           </div>
-                          <span className="font-semibold text-slate-950">{u.full_name}</span>
+                          <span className="font-semibold text-slate-900">{u.full_name}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-slate-600 text-sm px-4 py-3 bg-transparent">{u.email}</TableCell>
@@ -320,7 +320,7 @@ export default function UsersPage() {
 
       {/* Create User Dialog */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-[425px] bg-[#e6f0fa]">
+        <DialogContent className="sm:max-w-[425px] bg-white">
           <DialogHeader>
             <DialogTitle className="text-slate-900">Tambah User Baru</DialogTitle>
             <DialogDescription className="text-slate-500">
@@ -343,7 +343,7 @@ export default function UsersPage() {
                 onChange={(e) => setNewName(e.target.value)}
                 required
                 placeholder="Super Admin"
-                className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
+                className="bg-white border-slate-300 focus-visible:ring-[#0077ff] text-slate-800"
               />
             </div>
             <div className="space-y-1.5">
@@ -355,7 +355,7 @@ export default function UsersPage() {
                 onChange={(e) => setNewEmail(e.target.value)}
                 required
                 placeholder="admin@enterprise.com"
-                className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
+                className="bg-white border-slate-300 focus-visible:ring-[#0077ff] text-slate-800"
               />
             </div>
             <div className="space-y-1.5">
@@ -368,7 +368,7 @@ export default function UsersPage() {
                 required
                 minLength={6}
                 placeholder="••••••"
-                className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
+                className="bg-white border-slate-300 focus-visible:ring-[#0077ff] text-slate-800"
               />
             </div>
             <div className="space-y-1.5">
@@ -377,7 +377,7 @@ export default function UsersPage() {
                 id="role"
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value)}
-                className="w-full !bg-[#e6f0fa] border border-slate-200 rounded-lg p-2 text-slate-850 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
+                className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
               >
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
@@ -400,7 +400,7 @@ export default function UsersPage() {
       {/* Edit User Dialog */}
       <Dialog open={editingUser !== null} onOpenChange={(open) => !open && setEditingUser(null)}>
         {editingUser && (
-          <DialogContent className="sm:max-w-[425px] bg-[#e6f0fa]">
+          <DialogContent className="sm:max-w-[425px] bg-white">
             <DialogHeader>
               <DialogTitle className="text-slate-900">Edit User</DialogTitle>
               <DialogDescription className="text-slate-500">
@@ -415,7 +415,7 @@ export default function UsersPage() {
                   id="edit-name"
                   value={editingUser.full_name}
                   onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
-                  className="!bg-[#e6f0fa] border-slate-200 focus-visible:ring-[#0077ff] text-slate-800"
+                  className="bg-white border-slate-300 focus-visible:ring-[#0077ff] text-slate-800"
                 />
               </div>
               <div className="space-y-1.5">
@@ -424,7 +424,7 @@ export default function UsersPage() {
                   id="edit-role"
                   value={editingUser.role}
                   onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                  className="w-full !bg-[#e6f0fa] border border-slate-200 rounded-lg p-2 text-slate-850 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0077ff]/50 shadow-sm text-sm"
                 >
                   <option value="user">User</option>
                   <option value="admin">Admin</option>

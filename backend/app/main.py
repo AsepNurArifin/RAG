@@ -27,6 +27,11 @@ logging.basicConfig(
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+# Disable verbose logging from noisy libraries
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("chromadb").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------ #
@@ -84,19 +89,46 @@ async def health_check():
 # ------------------------------------------------------------------ #
 @app.on_event("startup")
 async def startup_event():
-    """Inisialisasi saat aplikasi dimulai."""
+    """Inisialisasi saat aplikasi dimulai. Pre-load models untuk eliminate cold start."""
+    import time
+    t0 = time.time()
     logger.info("=" * 60)
     logger.info("EnterpriseMind AI Backend starting...")
     logger.info("Environment: %s", settings.APP_ENV)
     logger.info("CORS Origins: %s", settings.CORS_ORIGINS)
-    logger.info(
-        "LLM Models: fast=%s, reasoning=%s",
-        settings.FAST_MODEL,
-        settings.REASONING_MODEL,
-    )
-    logger.info(
-        "Rate Limit: %d requests/minute", settings.RATE_LIMIT_PER_MINUTE
-    )
+    logger.info("LLM Fast Model: %s", settings.GROQ_MODEL_FAST)
+    logger.info("LLM Reasoning Model: %s", settings.GROQ_MODEL_REASONING)
+    logger.info("Rate Limit: %d requests/minute", settings.RATE_LIMIT_PER_MINUTE)
+
+    # Pre-load embedding model (eliminates ~20s cold start)
+    try:
+        from app.ingestion.embedder import get_embedding_model
+        logger.info("Pre-loading embedding model: %s...", settings.EMBEDDING_MODEL)
+        get_embedding_model()
+        logger.info("Embedding model ready.")
+    except Exception as e:
+        logger.warning("Failed to pre-load embedding model: %s", e)
+
+    # Pre-load reranker model (eliminates ~5s cold start)
+    try:
+        from app.retrieval.reranker import get_reranker
+        logger.info("Pre-loading reranker model...")
+        get_reranker()
+        logger.info("Reranker model ready.")
+    except Exception as e:
+        logger.warning("Failed to pre-load reranker model: %s", e)
+
+    # Pre-initialize Sastrawi stemmer (eliminates ~1s first-call init)
+    try:
+        from app.retrieval.hybrid_search import _get_stemmer
+        logger.info("Pre-loading Sastrawi stemmer...")
+        _get_stemmer()
+        logger.info("Sastrawi stemmer ready.")
+    except Exception as e:
+        logger.warning("Failed to pre-load Sastrawi stemmer: %s", e)
+
+    elapsed = time.time() - t0
+    logger.info("Startup pre-loading completed in %.1fs", elapsed)
     logger.info("=" * 60)
 
 
@@ -146,7 +178,7 @@ if __name__ == "__main__":
         "app.main:app",
         host=settings.APP_HOST,
         port=settings.APP_PORT,
-        reload=settings.APP_ENV == "development",
+        reload=False,
     )
 
 # Trigger reload

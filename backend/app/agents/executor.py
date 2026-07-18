@@ -22,7 +22,6 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.agents import EXECUTOR_PROMPT
 from app.core.llm_provider import get_llm
-from app.core.observability import get_callbacks
 from app.graph.state import GraphState
 
 logger = logging.getLogger(__name__)
@@ -41,7 +40,6 @@ def run_executor_agent(state: GraphState) -> GraphState:
 
     Side effects:
         - API call ke Groq (model fast) via LangChain.
-        - Trace ke LangFuse via callback handler.
     """
     query = state.get("query", "")
     final_answer = state.get("final_answer", "")
@@ -64,10 +62,6 @@ def run_executor_agent(state: GraphState) -> GraphState:
     )
 
     llm = get_llm("fast")
-    callbacks = get_callbacks(
-        trace_name="executor_agent",
-        session_id=session_id,
-    )
 
     chain = prompt | llm
     response = chain.invoke(
@@ -75,7 +69,6 @@ def run_executor_agent(state: GraphState) -> GraphState:
             "query": query,
             "context": final_answer[:1000],
         },
-        config={"callbacks": callbacks},
     )
 
     # Parse response

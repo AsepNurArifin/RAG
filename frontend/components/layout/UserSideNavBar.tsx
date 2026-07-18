@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Plus, History, LogOut, User, Trash2, MessageSquare, Menu, X } from "lucide-react";
+import { Plus, History, LogOut, User, Trash2, MessageSquare, Menu, X, Sparkles } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -88,10 +88,15 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
       {/* Header */}
       <div className="mb-6 pl-2 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white mb-1">
-            EnterpriseMind AI
-          </h1>
-          <p className="text-xs font-medium text-blue-100 flex items-center">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight text-white">
+              EnterpriseMind
+            </h1>
+          </div>
+          <p className="text-xs font-medium text-blue-100 flex items-center pl-10">
             <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
             System Active
           </p>
@@ -100,16 +105,16 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
           variant="ghost"
           size="icon"
           onClick={() => onToggleSidebar?.(false)}
-          className="md:hidden text-white hover:bg-blue-800/60 h-8 w-8"
+          className="md:hidden text-white hover:bg-white/10 h-8 w-8"
         >
           <X className="w-5 h-5" />
         </Button>
       </div>
 
       {/* New Analysis Button */}
-      <Button 
+      <Button
         onClick={handleNewChat}
-        className="w-full bg-[#F2C300] hover:bg-[#d8a815] text-slate-900 font-bold py-3 gap-2 mb-6 shadow-sm border border-yellow-400/50"
+        className="w-full bg-[#F2C300] hover:bg-[#d8a815] text-slate-900 font-bold py-3 gap-2 mb-6 shadow-sm"
       >
         <Plus className="w-4 h-4 text-slate-900" />
         New Analysis
@@ -124,7 +129,7 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
       </div>
 
       {/* Session List */}
-      <div className="flex-grow overflow-y-auto space-y-1 pr-1"> 
+      <div className="flex-grow overflow-y-auto space-y-1 pr-1">
         {isLoadingSessions ? (
           <div className="text-center py-4">
             <span className="text-sm text-blue-200/60 animate-pulse">
@@ -149,8 +154,8 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
                 onClick={() => handleSessionClick(session.session_id)}
                 className={`w-full text-left flex items-center justify-between pl-3 pr-2 py-2 rounded-lg transition-all group cursor-pointer
                   ${isActive
-                    ? "bg-blue-800/80 text-white font-semibold border-l-4 border-[#F2C300]"
-                    : "text-blue-100 hover:bg-blue-800/40 hover:text-white"
+                    ? "bg-white/15 text-white font-semibold border-l-4 border-[#F2C300]"
+                    : "text-blue-100 hover:bg-white/10 hover:text-white"
                   }
                 `}
               >
@@ -173,10 +178,10 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
       </div>
 
       {/* User Profile & Logout */}
-      <div className="mt-auto pt-4 border-t border-blue-700/50">
-        <div className="flex items-center gap-3 px-3 py-3 mx-1 rounded-xl bg-blue-800/50 border border-blue-700/40 text-white">
-          <Avatar className="w-9 h-9 border border-blue-700 shadow-sm bg-blue-900/50">
-            <AvatarFallback className="bg-blue-900 text-blue-100">
+      <div className="mt-auto pt-4 border-t border-white/10">
+        <div className="flex items-center gap-3 px-3 py-3 mx-1 rounded-xl bg-white/10 border border-white/10 text-white">
+          <Avatar className="w-9 h-9 border border-white/20 shadow-sm bg-[#0077ff]">
+            <AvatarFallback className="bg-[#0077ff] text-white">
               <User className="w-4 h-4" />
             </AvatarFallback>
           </Avatar>
@@ -188,7 +193,7 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
               {user?.role || "user"}
             </p>
           </div>
-          <Button 
+          <Button
             variant="ghost"
             size="icon"
             onClick={logout}
@@ -209,13 +214,13 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
         variant="ghost"
         size="icon"
         onClick={() => onToggleSidebar?.(!isSidebarOpen)}
-        className="fixed top-4 left-4 z-30 md:hidden bg-[#0077ff] text-white hover:bg-blue-700 shadow-lg h-10 w-10"
+        className="fixed top-4 left-4 z-30 md:hidden bg-[#004790] text-white hover:bg-[#0077ff] shadow-lg h-10 w-10"
       >
         <Menu className="w-5 h-5" />
       </Button>
 
       {/* Desktop sidebar — always visible */}
-      <div className="hidden md:flex fixed left-0 top-0 h-full w-[280px] bg-[#0077ff] border-r border-blue-700/30 z-20 shadow-md flex-col">
+      <div className="hidden md:flex fixed left-0 top-0 h-full w-[280px] bg-[#004790] border-r border-blue-800/30 z-20 shadow-md flex-col">
         {sidebarContent}
       </div>
 
@@ -235,7 +240,7 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed left-0 top-0 h-full w-[280px] bg-[#0077ff] z-40 md:hidden shadow-2xl flex flex-col"
+              className="fixed left-0 top-0 h-full w-[280px] bg-[#004790] z-40 md:hidden shadow-2xl flex flex-col"
             >
               {sidebarContent}
             </motion.div>
@@ -245,7 +250,7 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={sessionToDelete !== null} onOpenChange={(open) => !open && setSessionToDelete(null)}>
-        <DialogContent className="sm:max-w-[400px] bg-[#e6f0fa] shadow-xl">
+        <DialogContent className="sm:max-w-[400px] bg-white shadow-xl">
           <DialogHeader>
             <DialogTitle className="text-slate-900 font-bold text-lg">Hapus Riwayat Chat</DialogTitle>
             <DialogDescription className="text-slate-600 mt-2">
@@ -258,7 +263,7 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
                 Batal
               </Button>
             } />
-            <Button 
+            <Button
               onClick={confirmDeleteSession}
               className="bg-red-600 hover:bg-red-700 text-white font-semibold"
             >

@@ -1,55 +1,162 @@
-services:
-  backend:
-    build: .
-    container_name: enterprisemind_backend
-    ports:
-      - "8000:8000"
-    environment:
-      - APP_ENV=production
-    env_file:
-      - .env
-    restart: unless-stopped
-    volumes:
-      - chroma_data:/app/chroma_db
-      - uploads:/app/uploads
-    depends_on:
-      chroma:
-        condition: service_healthy
-    networks:
-      - enterprisemind_net
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "2.0"
+# EnterpriseMind AI — Docker Compose
+# ChromaDB + Temporal (dengan PostgreSQL internal)
+# Backend + Application PostgreSQL run locally
+#
+# Usage:
+#   docker compose up -d      # Start services
+#   docker compose down        # Stop services
+#   docker compose logs -f     # View logs
 
-  chroma:
-    image: chromadb/chroma:0.5.23
-    container_name: enterprisemind_chroma
+services:
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: enterprisemind_etcd
     environment:
-      - IS_PERSISTENT=TRUE
-      - PERSIST_DIRECTORY=/chroma/chroma
-      - ANONYMIZED_TELEMETRY=FALSE
-    restart: unless-stopped
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
     volumes:
-      - chroma_data:/chroma/chroma
+      - milvus_etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
     networks:
       - enterprisemind_net
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: "1.0"
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: enterprisemind_minio
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - milvus_minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
+
+  milvus:
+    image: milvusdb/milvus:v2.5.6
+    container_name: enterprisemind_milvus
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    command: ["milvus", "run", "standalone"]
+    depends_on:
+      milvus-etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
+
+  temporal-db:
+    image: postgres:16-alpine
+    container_name: enterprisemind_temporal_db
+    environment:
+      - POSTGRES_DB=temporal
+      - POSTGRES_USER=temporal
+      - POSTGRES_PASSWORD=temporal_password
+    volumes:
+      - temporal_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
+
+  temporal:
+    image: temporalio/auto-setup:1.24.0
+    container_name: enterprisemind_temporal
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal_password
+      - POSTGRES_SEEDS=temporal-db
+    ports:
+      - "7233:7233"
+    depends_on:
+      temporal-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
+
+  temporal-ui:
+    image: temporalio/ui:2.28.0
+    container_name: enterprisemind_temporal_ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8081:8080"
+    depends_on:
+      - temporal
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
+
+  docling:
+    image: quay.io/docling-project/docling-serve:latest
+    container_name: enterprisemind_docling
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=true
+      - DOCLING_SERVE_MAX_SYNC_WAIT=1800
+      - DOCLING_SERVE_ENGINE=DoclingParseV2DocumentBackend
+      - DOCLING_NUM_THREADS=4
+    ports:
+      - "5001:5001"
+    volumes:
+      - docling_models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
 
 volumes:
-  chroma_data:
+  milvus_etcd:
     driver: local
-  uploads:
+  milvus_minio:
+    driver: local
+  milvus_data:
+    driver: local
+  temporal_data:
+    driver: local
+  docling_models:
     driver: local
 
 networks:

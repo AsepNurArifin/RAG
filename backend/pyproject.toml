@@ -1,0 +1,46 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "EnterpriseMind AI — Agentic RAG System"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "asyncpg>=0.29.0",
+    "bcrypt>=5.0.0",
+    "fastapi==0.115.0",
+    "minio>=7.2.7",
+    "httpx==0.28.1",
+    "langchain==0.3.13",
+    "langchain-milvus>=0.2.0",
+    "pymilvus==2.5.10",
+    "langchain-community==0.3.13",
+    "langchain-google-genai>=2.0.0",
+    "langchain-huggingface==0.1.2",
+    "langgraph==0.2.61",
+    "python-docx==1.2.0",
+    "python-dotenv==1.0.1",
+    "python-jose[cryptography]>=3.5.0",
+    "python-multipart==0.0.9",
+    "sentence-transformers==3.0.1",
+    "Sastrawi>=1.0.1",
+    "slowapi==0.1.9",
+    "temporalio>=1.8.0",
+    "tenacity==9.1.4",
+    "uvicorn[standard]==0.30.6",
+    "langchain-groq>=0.3.2",
+    "pymupdf>=1.28.0",
+    "pymupdf4llm>=0.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "datasets==3.2.0",
+    "locust==2.36.0",
+    "mypy==1.14.1",
+    "pandas==2.2.3",
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "ragas==0.2.13",
+    "ruff==0.9.6",
+]

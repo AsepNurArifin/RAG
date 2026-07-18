@@ -8,7 +8,7 @@ untuk formatting dokumen, history, dan data lainnya.
 
 def format_documents_for_prompt(
     documents: list[dict],
-    max_chars: int = 800,
+    max_chars: int = 1500,
     include_date: bool = True,
 ) -> str:
     """
@@ -30,12 +30,11 @@ def format_documents_for_prompt(
         if include_date:
             date = doc.get("date", doc.get("upload_date", "N/A")) or "N/A"
             parts.append(
-                f"--- Dokumen {i} ---\n"
-                f"Sumber: {source} (tanggal: {date})\n"
-                f"Konten: {content}\n"
+                f"[Dokumen {i}] (Sumber: {source}, Tanggal: {date})\n"
+                f"{content}\n"
             )
         else:
-            parts.append(f"[Sumber: {source}]\n{content}\n")
+            parts.append(f"[Dokumen {i}] (Sumber: {source})\n{content}\n")
 
     return "\n".join(parts)
 

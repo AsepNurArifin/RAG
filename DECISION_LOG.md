@@ -103,6 +103,19 @@
 
 ---
 
+### ADR-011 — Arsitektur Hybrid Page-Level Ingestion & Dedup
+**Tanggal:** Juli 2026
+**Status:** Diterima
+**Konteks:** Docling (VLM) berjalan sangat lambat (8 menit per dokumen) jika memproses seluruh file PDF secara merata. Di sisi lain, vektor *deduplication* menggunakan *cosine similarity* di Milvus terlalu lambat untuk *real-time ingestion*.
+**Keputusan:** 
+1. Menerapkan **Page-Level Router**: Memecah PDF per halaman, menggunakan `pymupdf4llm` (teks polos) dan mengisolasi Docling khusus untuk halaman diagram/tabel.
+2. Mengubah *signature* fungsi ekstraksi menjadi `List[dict]` dengan skema `PageExtraction` agar metadata `extraction_method` bisa diteruskan ke *chunk*.
+3. **Deduplikasi Tingkat Lanjut**: Menggunakan algoritma hash (contoh: SHA-256 terhadap teks ternormalisasi) untuk *exact/near-exact dedup* di level *pre-chunking*, menghindari *similarity search* berat saat *ingestion*.
+4. **Catatan Lisensi**: `pymupdf4llm` menggunakan lisensi AGPL-3.0. Hal ini diizinkan untuk skala portofolio/penelitian, namun perlu dicatat jika sistem berubah menjadi produk tertutup (komersial), *source code* wajib dibuka atau membutuhkan lisensi komersial dari Artifex.
+**Konsekuensi:** Kinerja *ingestion* menjadi sangat cepat untuk teks biasa, efisiensi penyimpanan (*vector store*) meningkat karena *hash-based dedup*, dan dukungan kompatibilitas mundur (helper `flatten_pages`) tersedia untuk modul lain yang membutuhkan bentuk `string` utuh.
+
+---
+
 *Template untuk entri baru:*
 ```
 ### ADR-XXX — [Judul Keputusan]

@@ -1,11 +1,10 @@
 """
-EnterpriseMind AI — API Package.
+API Routes — EnterpriseMind AI.
 
-RESTful API routes yang mengekspos endpoint:
-- /api/upload   — Upload dokumen
-- /api/query    — Tanya ke sistem multi-agent
-- /api/documents — Kelola dokumen
-- /api/metrics  — Metrik performa
-
-Ref: A.3.3 di SRS_PRD.md
+Re-export routers for FastAPI include_router().
 """
+from app.api.upload import router as upload_router
+from app.api.query import router as query_router
+from app.api.auth import router as auth_router
+
+__all__ = ["upload_router", "query_router", "auth_router"]

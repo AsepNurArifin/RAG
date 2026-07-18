@@ -1,25 +1,17 @@
 """
 Auth API — EnterpriseMind AI.
 
-Endpoint autentikasi untuk login dan mendapatkan profil user.
-Tidak ada registrasi publik — user hanya bisa dibuat oleh admin.
-
-Endpoints:
-    POST /api/auth/login  — Login dengan email + password
-    GET  /api/auth/me     — Profil user dari JWT token
+POST /api/auth/login  — Login with email + password
+POST /api/auth/logout — Logout (invalidate token)
+GET  /api/auth/me     — Get current user profile
 """
-
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
-from app.core.auth import (
-    create_access_token,
-    get_current_user,
-    verify_password,
-)
-from app.core.supabase_client import get_supabase_client
+from app.core.auth import create_access_token, get_current_user, verify_password
+from app.core.postgres_client import fetch_one, execute_query
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -27,142 +19,87 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 
-# ------------------------------------------------------------------ #
-# Request / Response Models
-# ------------------------------------------------------------------ #
-
-
 class LoginRequest(BaseModel):
-    """Request body untuk login."""
     email: str
     password: str
 
 
 class LoginResponse(BaseModel):
-    """Response body setelah login berhasil."""
     access_token: str
     token_type: str = "bearer"
     user: dict
 
 
-class UserProfile(BaseModel):
-    """Profil user."""
-    id: str
-    email: str
-    full_name: str
-    role: str
-
-
-# ------------------------------------------------------------------ #
-# Endpoints
-# ------------------------------------------------------------------ #
-
-
 @router.post("/login", response_model=LoginResponse)
 async def login(body: LoginRequest, response: Response):
+    """Login. Returns JWT token with RBAC fields. Sets HTTPOnly cookie."""
+    query = """
+        SELECT id, email, full_name, role, is_active, token_version,
+               department, clearance_level, password_hash
+        FROM users
+        WHERE email = $1
     """
-    Login dengan email dan password.
+    user = await fetch_one(query, body.email)
 
-    Returns:
-        JWT access token dan data user.
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email atau password salah.")
 
-    Raises:
-        HTTPException 401 jika email/password salah.
-    """
-    client = get_supabase_client()
-
-    # Cari user berdasarkan email
-    result = (
-        client.table("users")
-        .select("*")
-        .eq("email", body.email)
-        .execute()
-    )
-
-    if not result.data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email atau password salah.",
-        )
-
-    user = result.data[0]
-
-    # Cek apakah akun aktif
     if not user.get("is_active", False):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Akun Anda telah dinonaktifkan. Hubungi admin.",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akun Anda telah dinonaktifkan. Hubungi admin.")
 
-    # Verifikasi password
     if not verify_password(body.password, user["password_hash"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email atau password salah.",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email atau password salah.")
 
-    # Buat JWT token
-    token = create_access_token(
-        data={
-            "sub": user["id"],
-            "role": user["role"],
-            "token_version": user.get("token_version", 1)
-        }
-    )
+    # JWT with RBAC fields
+    token = create_access_token(data={
+        "sub": str(user["id"]),
+        "role": user["role"],
+        "department": user.get("department", "") or "",
+        "clearance_level": user.get("clearance_level", 1) or 1,
+        "token_version": user.get("token_version", 1) or 1,
+    })
 
-    logger.info("Login berhasil: email=%s, role=%s", user["email"], user["role"])
+    logger.info("Login berhasil: email=%s, role=%s, department=%s", user["email"], user["role"], user.get("department", ""))
 
-    # Set token in HTTPOnly cookie
     response.set_cookie(
-        key="emind_token",
-        value=token,
-        httponly=True,
-        secure=settings.APP_ENV == "production",
-        samesite="lax",
-        max_age=settings.JWT_EXPIRE_MINUTES * 60
+        key="emind_token", value=token, httponly=True,
+        secure=settings.APP_ENV == "production", samesite="lax",
+        max_age=settings.JWT_EXPIRE_MINUTES * 60,
     )
 
     return LoginResponse(
         access_token=token,
         user={
-            "id": user["id"],
+            "id": str(user["id"]),
             "email": user["email"],
             "full_name": user["full_name"],
             "role": user["role"],
-        },
+            "department": user.get("department", "") or "",
+            "clearance_level": user.get("clearance_level", 1) or 1,
+        }
     )
+
 
 @router.post("/logout")
 async def logout(response: Response, user: dict = Depends(get_current_user)):
-    """
-    Logout user dengan menghapus cookie token.
-    """
-    client = get_supabase_client()
-    
-    # Increment token_version di DB untuk membatalkan semua token yang diterbitkan sebelumnya
-    current_version = user.get("token_version", 1)
-    client.table("users").update({"token_version": current_version + 1}).eq("id", user["id"]).execute()
-
-    response.delete_cookie(
-        key="emind_token",
-        httponly=True,
-        secure=True,
-        samesite="lax",
+    """Logout — increment token_version to invalidate all previous tokens."""
+    current_version = user.get("token_version", 1) or 1
+    await execute_query(
+        "UPDATE users SET token_version = $1, updated_at = NOW() WHERE id = $2",
+        current_version + 1, str(user["id"]),
     )
+
+    response.delete_cookie(key="emind_token", httponly=True, secure=True, samesite="lax")
     return {"message": "Berhasil logout."}
 
 
 @router.get("/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    """
-    Dapatkan profil user yang sedang login.
-
-    Returns:
-        Data profil user.
-    """
     return {
-        "id": user["id"],
+        "id": str(user["id"]),
         "email": user["email"],
         "full_name": user["full_name"],
         "role": user["role"],
+        "department": user.get("department", "") or "",
+        "clearance_level": user.get("clearance_level", 1) or 1,
     }

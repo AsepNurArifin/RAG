@@ -16,7 +16,7 @@ export function CitationCard({ citation, index }: CitationCardProps) {
   const excerpt = citation.excerpt || "No excerpt available.";
   const relevance = citation.relevance_score ?? 0;
   const date = citation.date || "";
-  
+
   const handleClick = () => {
     if (citation.source) {
       const el = document.getElementById(`citation-${index}`);
@@ -31,8 +31,8 @@ export function CitationCard({ citation, index }: CitationCardProps) {
       whileHover={{ y: -4 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
-      <Card 
-        className="h-full flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow border-slate-200 overflow-hidden bg-[#e6f0fa]"
+      <Card
+        className="h-full flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow border-slate-200 overflow-hidden bg-white"
         onClick={handleClick}
         role="button"
         tabIndex={0}
@@ -43,23 +43,23 @@ export function CitationCard({ citation, index }: CitationCardProps) {
             DOC-{source.substring(0, 8)}
           </div>
           <div className="flex items-center gap-2 text-[#0077ff] mt-2">
-            <FileText className="w-4 h-4" />
+            <FileText className="w-4 h-4 flex-shrink-0" />
             <span className="font-semibold text-sm uppercase line-clamp-1 break-all" title={source}>
               {source}
             </span>
           </div>
         </CardHeader>
-        
+
         <CardContent className="p-4 pt-0 flex-grow">
           <p className="text-sm text-slate-600 italic line-clamp-3">
             &quot;{excerpt}&quot;
           </p>
         </CardContent>
-        
+
         <CardFooter className="p-4 pt-0 border-t border-slate-100 mt-auto flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-2">
             {date && <span className="font-medium">{date}</span>}
-            <Badge variant="secondary" className="font-mono text-[10px]">
+            <Badge variant="secondary" className="font-mono text-[10px] bg-[#e6f0fa] text-[#0077ff]">
               MATCH {Math.floor(relevance * 100)}%
             </Badge>
           </div>

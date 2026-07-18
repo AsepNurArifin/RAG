@@ -1,0 +1,13 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,/api/documents,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",71,2026-07-13T01:29:54Z,2026-07-13T01:29:55Z
+POST,/api/query,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",265,2026-07-13T01:29:52Z,2026-07-13T01:29:55Z
+GET,/api/metrics,"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",7467,2026-07-13T01:30:00Z,2026-07-13T01:35:10Z
+POST,/api/query,"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=20)""))",113,2026-07-13T01:30:12Z,2026-07-13T01:30:18Z
+GET,/api/documents,"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",7689,2026-07-13T01:30:00Z,2026-07-13T01:35:10Z
+POST,/api/query,HTTPError('401 Client Error: Unauthorized for url: /api/query'),1709,2026-07-13T01:29:25Z,2026-07-13T01:29:51Z
+POST,/api/query,"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",22536,2026-07-13T01:30:00Z,2026-07-13T01:35:10Z
+GET,/api/documents,HTTPError('401 Client Error: Unauthorized for url: /api/documents'),560,2026-07-13T01:29:25Z,2026-07-13T01:29:51Z
+GET,/api/metrics,HTTPError('401 Client Error: Unauthorized for url: /api/metrics'),562,2026-07-13T01:29:25Z,2026-07-13T01:29:51Z
+GET,/health,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",84,2026-07-13T01:29:52Z,2026-07-13T01:29:55Z
+GET,/api/metrics,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",95,2026-07-13T01:29:52Z,2026-07-13T01:29:55Z
+GET,/health,"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",7530,2026-07-13T01:30:00Z,2026-07-13T01:35:10Z

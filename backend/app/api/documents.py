@@ -51,11 +51,24 @@ async def remove_document(
     """
     logger.info("Menghapus dokumen: id=%s, filename=%s", document_id, filename)
     try:
-        # 1. Hapus dari vector store (Chroma)
-        delete_document_chunks(filename)
+        # 0. Dapatkan storage_object_name dari database sebelum dihapus
+        from app.core.postgres_client import fetch_one
+        doc = await fetch_one("SELECT storage_object_name FROM documents WHERE id = $1", document_id)
+        
+        # 1. Hapus dari vector store (Milvus)
+        try:
+            delete_document_chunks(filename)
+        except Exception as e:
+            logger.error("Gagal menghapus chunks dari Milvus untuk %s: %s", filename, e)
 
-        # 2. Hapus dari metadata DB (Supabase)
+        # 2. Hapus dari metadata DB (Supabase/PostgreSQL)
         await delete_document(document_id)
+
+        # 3. Hapus dari MinIO
+        if doc and doc.get("storage_object_name"):
+            from app.core.minio_client import minio_client
+            import asyncio
+            await asyncio.to_thread(minio_client.delete_file, doc["storage_object_name"])
 
         return {"status": "success", "message": f"Dokumen {filename} dihapus."}
     except Exception as e:
