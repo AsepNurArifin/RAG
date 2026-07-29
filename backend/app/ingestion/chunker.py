@@ -57,6 +57,7 @@ SEPARATORS = [
     "\n### ",
     "\n#### ",
     "\n\n",
+    "\n| ",
     "\n",
     ". ",
     "? ",
@@ -87,7 +88,7 @@ def chunk_pages(
     
     Setiap chunk mendapatkan metadata:
     - page_number: nomor halaman asal
-    - extraction_method: metode ekstraksi (pymupdf4llm/vlm_docling)
+    - extraction_method: metode ekstraksi (docling)
     - content_hash: SHA-256 hash untuk deduplication
     
     Args:
@@ -231,6 +232,9 @@ def chunk_document_parent_child(
     )
     parent_texts = parent_splitter.split_text(text)
 
+    # Filter parent chunks yang terlalu kecil (< 50 chars)
+    parent_texts = [t for t in parent_texts if len(t.strip()) >= 50]
+
     parent_chunks = []
     child_chunks = []
 
@@ -264,6 +268,9 @@ def chunk_document_parent_child(
             is_separator_regex=False,
         )
         child_texts = child_splitter.split_text(parent_text)
+
+        # Filter child chunks yang terlalu kecil (< 30 chars)
+        child_texts = [t for t in child_texts if len(t.strip()) >= 30]
 
         for child_idx, child_text in enumerate(child_texts):
             child_id = f"{parent_id}__child_{child_idx}"

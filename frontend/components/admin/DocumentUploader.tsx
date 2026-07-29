@@ -88,7 +88,7 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
               <UploadCloud className="w-6 h-6 sm:w-8 sm:h-8 text-[#0077ff]" />
             </div>
             <p className="text-sm font-semibold text-slate-800 mb-1">Klik untuk unggah dokumen</p>
-            <p className="text-xs text-slate-500 mb-3 sm:mb-4">PDF, DOCX, TXT (Maks 5MB)</p>
+            <p className="text-xs text-slate-500 mb-3 sm:mb-4">PDF, DOCX, TXT (Maks 50MB)</p>
               <span className="inline-flex items-center justify-center rounded-md text-sm font-semibold transition-colors border border-slate-200 bg-white text-[#0077ff] hover:bg-[#0077ff]/5 shadow-sm h-9 px-4 py-2 select-none">
               Pilih File
             </span>

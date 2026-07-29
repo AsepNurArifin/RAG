@@ -12,6 +12,7 @@ Improvements (Sprint 2):
 """
 import logging
 import re
+from functools import lru_cache
 
 from app.retrieval.vector_store import similarity_search_with_scores
 from app.retrieval.stopwords_id import STOP_WORDS_ID
@@ -67,13 +68,24 @@ def _tokenize_improved(text: str) -> set[str]:
     Sebelumnya: 4000+ panggilan stem() → 35s
     Sekarang: ~20 panggilan stem() (1 per dokumen) → <1s
     """
+    return set(_cached_tokenize(text))
+
+
+@lru_cache(maxsize=200)
+def _cached_tokenize(text: str) -> frozenset:
+    """
+    Cached version of tokenization.
+    LRU cache: 200 most recent unique texts.
+    Dokumen yang sering di-retrieve tidak perlu di-stem ulang.
+    Ref: OPTIMIZATION_PLAN.md P3
+    """
     words = re.findall(r"\w+", text.lower())
     synonyms = _load_synonyms()
 
     # Filter stop words
     filtered = [w for w in words if w not in STOP_WORDS_ID and len(w) > 1]
     if not filtered:
-        return set()
+        return frozenset()
 
     # Stem SELURUH text sekaligus (Sastrawi lebih efektif dengan konteks kalimat)
     stemmer = _get_stemmer()
@@ -95,7 +107,7 @@ def _tokenize_improved(text: str) -> set[str]:
         bigram = f"{filtered[i]}_{filtered[i+1]}"
         stemmed_words.add(bigram)
 
-    return stemmed_words
+    return frozenset(stemmed_words)
 
 
 def hybrid_search(
@@ -139,10 +151,17 @@ def hybrid_search(
                 "relevance_score": round(combined_score, 4),
                 "chunk_index": doc.metadata.get("chunk_index", 0),
                 "document_id": doc.metadata.get("document_id", ""),
+                "parent_id": doc.metadata.get("parent_id", ""),
+                "chunk_type": doc.metadata.get("chunk_type", ""),
+                "page_number": doc.metadata.get("page_number", 0),
             }
 
+    # Filter minimum relevance threshold
+    min_relevance = 0.05
+    filtered_results = {k: v for k, v in scored_results.items() if v["relevance_score"] >= min_relevance}
+
     sorted_results = sorted(
-        scored_results.values(),
+        filtered_results.values(),
         key=lambda x: x["relevance_score"],
         reverse=True,
     )[:k]

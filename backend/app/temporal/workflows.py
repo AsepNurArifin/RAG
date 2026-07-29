@@ -78,7 +78,7 @@ class IngestionWorkflow:
             text = await workflow.execute_activity(
                 "extract_text",
                 args=[local_file_path, file_type],
-                start_to_close_timeout=timedelta(seconds=1800),
+                start_to_close_timeout=timedelta(seconds=2400),
                 task_queue=TASK_QUEUE,
                 retry_policy=RetryPolicy(maximum_attempts=3, backoff_coefficient=2),
             )
@@ -93,7 +93,7 @@ class IngestionWorkflow:
             chunks_result = await workflow.execute_activity(
                 "chunk_document",
                 args=[text, metadata],
-                start_to_close_timeout=timedelta(seconds=120),
+                start_to_close_timeout=timedelta(seconds=600),
                 task_queue=TASK_QUEUE,
             )
 
@@ -106,7 +106,19 @@ class IngestionWorkflow:
                 retry_policy=RetryPolicy(maximum_attempts=3, backoff_coefficient=5),
             )
 
-            # Step 7: Update status to indexed
+            # Step 7: Graph extraction (optional — skip if text is not string)
+            try:
+                if isinstance(text, str) and text.strip():
+                    await workflow.execute_activity(
+                        "extract_graph",
+                        args=[text[:4000], filename, document_id],
+                        start_to_close_timeout=timedelta(seconds=120),
+                        task_queue=TASK_QUEUE,
+                    )
+            except Exception as graph_err:
+                workflow.logger.warning("Graph extraction skipped: %s", graph_err)
+
+            # Step 8: Update status to indexed
             await workflow.execute_activity(
                 "update_document_status",
                 args=[document_id, "indexed", embed_result["child_count"]],

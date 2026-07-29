@@ -127,18 +127,29 @@ def expand_query_llm(query: str, intent_type: str) -> str:
 
     llm = get_llm("fast", temperature=0.3, max_tokens=512)
 
-    prompt = f"""Expand query berikut dengan sinonim dan istilah terkait dalam bahasa Indonesia.
-Berikan 5-10 kata/frasa terkait yang akan membantu menemukan dokumen relevan.
-Pisahkan dengan koma.
+    prompt = f"""You are a query expansion engine. Output ONLY comma-separated terms, nothing else.
+No explanation, no preamble, no markdown. Just the terms.
+
+RULES:
+1. ALWAYS include the original keywords from the query first.
+2. Do NOT expand abbreviations/acronyms to meanings unrelated to the query context.
+   Keep abbreviations as-is and add contextually related terms instead.
+3. Infer the topic/domain from the query itself. Add synonyms and related terms
+   that match the query context — regardless of what domain it belongs to.
+4. Return 5-10 terms.
 
 Query: {query}
 Intent: {intent_type}
 
-Expanded terms:"""
+Output:"""
 
     try:
         response = llm.invoke(prompt)
-        terms = [t.strip() for t in response.content.split(",") if t.strip()]
+        response_text = response.content.strip()
+        # Strip conversational preamble
+        if "\n\n" in response_text:
+            response_text = response_text.rsplit("\n\n", 1)[-1]
+        terms = [t.strip() for t in response_text.split(",") if t.strip()]
         result = ", ".join(terms)
         logger.info("[Expansion] LLM: '%s' → '%s'", query[:50], result[:100])
         return result

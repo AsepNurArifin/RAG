@@ -127,6 +127,10 @@ export function useChatStream(initialSessionId?: string) {
       (error: Error) => {
         if (error.name === "AbortError") {
           console.log("Stream query cancelled.");
+          // Remove the user message that triggered this cancelled query
+          setMessages((prev) => prev.slice(0, -1));
+          setIsLoading(false);
+          setActiveAgent("idle");
           return;
         }
         console.error("Error sending message:", error);
@@ -145,6 +149,91 @@ export function useChatStream(initialSessionId?: string) {
     );
   }, [sessionId, isLoading, setActiveAgent]);
 
+  // Cancel an in-flight query
+  const cancelQuery = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setActiveAgent("idle");
+  }, [setActiveAgent]);
+
+  // Edit a user message and resend (Claude-like: remove all messages after the edited one)
+  const editAndResend = useCallback(async (messageId: string, newContent: string) => {
+    if (!newContent.trim() || isLoading) return;
+
+    // Find the message index
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1 || messages[messageIndex].role !== "user") return;
+
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Keep messages up to (and including) the edited message, update its content
+    const updatedMessages = [
+      ...messages.slice(0, messageIndex),
+      { ...messages[messageIndex], content: newContent },
+    ];
+
+    setMessages(updatedMessages);
+    setIsLoading(true);
+    setActiveAgent("orchestrator");
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    api.queryStream(
+      newContent,
+      sessionId,
+      (agent) => {
+        if (agent.includes("orchestrator")) setActiveAgent("orchestrator");
+        else if (agent.includes("researcher")) setActiveAgent("researcher");
+        else if (agent.includes("verifier")) setActiveAgent("verifier");
+        else if (agent.includes("summarizer")) setActiveAgent("summarizer");
+        else if (agent.includes("executor")) setActiveAgent("executor");
+      },
+      (response: QueryResponse) => {
+        if (!sessionId && response.session_id) {
+          setSessionId(response.session_id);
+        }
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: response.answer,
+          citations: response.citations,
+          actionItems: response.action_items,
+          confidenceScore: response.confidence_score,
+          intent: response.intent,
+          reflectionCount: response.reflection_count,
+          latencyMs: response.latency_ms,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+        setIsLoading(false);
+      },
+      (error: Error) => {
+        if (error.name === "AbortError") {
+          console.log("Edit-and-resend cancelled.");
+          return;
+        }
+        console.error("Error in editAndResend:", error);
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "system",
+          content: error.message || "Terjadi kesalahan sistem. Silakan coba lagi.",
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setIsLoading(false);
+      },
+      controller.signal
+    );
+  }, [messages, sessionId, isLoading, setActiveAgent]);
+
   const clearChat = useCallback(() => {
     setMessages([]);
     setSessionId(undefined);
@@ -154,6 +243,8 @@ export function useChatStream(initialSessionId?: string) {
     messages,
     isLoading,
     sendMessage,
+    cancelQuery,
+    editAndResend,
     clearChat,
     messagesEndRef,
     sessionId,

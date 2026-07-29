@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useChatStream } from "../hooks/useChatStream";
 import { MessageBubble } from "./MessageBubble";
 import { LoadingIndicator } from "./LoadingIndicator";
-import { Terminal, Send, Lightbulb, Sparkles } from "lucide-react";
+import { Terminal, Send, Square, Lightbulb, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
@@ -16,7 +16,7 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowProps) {
-  const { messages, isLoading, sendMessage, clearChat, messagesEndRef, sessionId, loadSessionHistory } = useChatStream();
+  const { messages, isLoading, sendMessage, cancelQuery, editAndResend, clearChat, messagesEndRef, sessionId, loadSessionHistory } = useChatStream();
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -48,6 +48,11 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape" && isLoading) {
+      e.preventDefault();
+      cancelQuery();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -108,7 +113,7 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
                       onClick={() => sendMessage(suggestion)}
                       className="p-4 flex items-center justify-center text-sm font-medium text-slate-600 hover:text-[#0077ff] hover:border-[#0077ff]/30 hover:bg-[#0077ff]/5 bg-white border-slate-200 cursor-pointer transition-colors h-full shadow-sm text-center"
                     >
-                      "{suggestion}"
+                      &ldquo;{suggestion}&rdquo;
                     </Card>
                   </motion.div>
                 ))}
@@ -117,7 +122,12 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
           ) : (
             <div className="pt-4">
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  onEdit={msg.role === "user" ? editAndResend : undefined}
+                  isLoading={isLoading}
+                />
               ))}
               {isLoading && <LoadingIndicator />}
               <div ref={messagesEndRef} className="h-4" />
@@ -154,18 +164,30 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
             />
 
             <div className="p-1 flex-shrink-0">
-              <Button
-                type="submit"
-                size="icon"
-                disabled={!inputValue.trim() || isLoading}
-                className={`h-10 w-10 rounded-xl transition-all ${
-                  inputValue.trim() && !isLoading
-                    ? "bg-[#0077ff] hover:bg-[#0047b3] text-white shadow-md"
-                    : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                <Send className="w-4 h-4" />
-              </Button>
+              {isLoading ? (
+                <Button
+                  type="button"
+                  onClick={cancelQuery}
+                  size="icon"
+                  className="h-10 w-10 rounded-xl bg-red-500 hover:bg-red-600 text-white shadow-md transition-all"
+                  title="Hentikan query (Esc)"
+                >
+                  <Square className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!inputValue.trim()}
+                  className={`h-10 w-10 rounded-xl transition-all ${
+                    inputValue.trim()
+                      ? "bg-[#0077ff] hover:bg-[#0047b3] text-white shadow-md"
+                      : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </motion.form>
           <div className="text-center mt-2">

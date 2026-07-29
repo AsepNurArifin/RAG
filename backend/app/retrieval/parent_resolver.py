@@ -66,6 +66,9 @@ def resolve_and_deduplicate_parents(
         # Cari parent dari store
         if parent_store and parent_id in parent_store:
             parent = parent_store[parent_id].copy()
+            # Carry over relevance/reranker scores from best child
+            parent["relevance_score"] = child.get("relevance_score", 0)
+            parent["reranker_score"] = child.get("reranker_score", 0)
             parent["resolved_from_children"] = _count_children(child_chunks, parent_id)
             unique_parents.append(parent)
         else:
@@ -114,18 +117,34 @@ def build_parent_store_from_chroma(milvus_store, parent_ids: list[str]) -> dict[
         ids_str = ", ".join(f'"{pid}"' for pid in parent_ids)
         expr = f"parent_id in [{ids_str}]"
         
+        # Query fields yang ADA di schema (bukan "metadata" yang tidak ada)
+        query_fields = ["text", "parent_id", "child_id", "chunk_type", 
+                        "filename", "page_number", "document_id", 
+                        "chunk_index", "extraction_method"]
+
         milvus_store.col.load()
         results = milvus_store.col.query(
             expr=expr,
-            output_fields=["text", "metadata", "parent_id"]
+            output_fields=query_fields
         )
 
         for doc in results:
-            parent_id = doc.get("parent_id") or doc.get("metadata", {}).get("parent_id")
+            parent_id = doc.get("parent_id")
             if parent_id:
+                # Build metadata dict dari individual fields
+                metadata = {
+                    "parent_id": parent_id,
+                    "child_id": doc.get("child_id", ""),
+                    "chunk_type": doc.get("chunk_type", ""),
+                    "filename": doc.get("filename", ""),
+                    "page_number": doc.get("page_number", 0),
+                    "document_id": doc.get("document_id", ""),
+                    "chunk_index": doc.get("chunk_index", 0),
+                    "extraction_method": doc.get("extraction_method", ""),
+                }
                 parent_store[parent_id] = {
                     "content": doc.get("text", ""),
-                    "metadata": doc.get("metadata", {}),
+                    "metadata": metadata,
                     "parent_id": parent_id,
                 }
 

@@ -106,7 +106,7 @@ def classify_intent_tiered(query: str) -> tuple[str, float]:
 
     # ---- Tier 2: Comparison ----
     comparison_hits = sum(1 for kw in COMPARISON_KEYWORDS if kw in query_lower)
-    if comparison_hits >= 2:
+    if comparison_hits >= 1:
         logger.info("[Intent] Tier 2: comparison (%d keywords matched, confidence=0.85)", comparison_hits)
         return ("comparison", 0.85)
 
@@ -119,6 +119,14 @@ def classify_intent_tiered(query: str) -> tuple[str, float]:
     # ---- Tier 2: Factual (question words + short query) ----
     question_words = {"apa", "siapa", "kapan", "di mana", "dimana", "berapa", "mengapa", "kenapa", "bagaimana"}
     has_question_word = any(qw in query_lower for qw in question_words)
+    
+    # Multi-entity definition query: "apa yang dimaksud X, Y, dan Z?"
+    import re as _re
+    uppercase_terms = _re.findall(r'\b[A-Z]{2,}\b', query)
+    if has_question_word and len(uppercase_terms) >= 2:
+        logger.info("[Intent] Tier 2: comprehensive (multi-entity: %s, confidence=0.85)", uppercase_terms)
+        return ("comprehensive", 0.85)
+    
     if has_question_word and len(query_words) <= 12:
         logger.info("[Intent] Tier 2: factual (confidence=0.8)")
         return ("factual", 0.8)

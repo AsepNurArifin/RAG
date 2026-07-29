@@ -94,6 +94,7 @@ async def process_query(
                 "citations": [],
                 "action_items": [],
                 "conversation_history": [],
+                "graph_context": "",
                 "error": None,
                 "query_deadline": time.time() + settings.QUERY_TIMEOUT_SECONDS,
             }
@@ -114,6 +115,9 @@ async def process_query(
                             await queue.put({"type": "agent", "agent": node_name})
                     logger.info("[Query] graph.astream completed. Total nodes: %d", node_count)
                     await queue.put({"type": "done"})
+                except asyncio.CancelledError:
+                    logger.info("[Query] Graph execution cancelled by client disconnect.")
+                    await queue.put({"type": "cancelled"})
                 except Exception as e:
                     logger.exception("[Query] Graph execution failed")
                     await queue.put({"type": "error", "message": str(e)})
@@ -122,12 +126,25 @@ async def process_query(
             graph_task = asyncio.create_task(run_graph())
 
             while True:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    logger.info("[Query] Client disconnected, cancelling graph task...")
+                    graph_task.cancel()
+                    try:
+                        await graph_task
+                    except asyncio.CancelledError:
+                        logger.info("[Query] Graph task cancelled successfully.")
+                    return
+
                 try:
                     # Tunggu maksimal 10 detik untuk pesan dari graph
                     msg = await asyncio.wait_for(queue.get(), timeout=10.0)
                     
                     if msg["type"] == "done":
                         break
+                    elif msg["type"] == "cancelled":
+                        logger.info("[Query] Graph cancelled, stopping event generator.")
+                        return
                     elif msg["type"] == "error":
                         raise RuntimeError(msg["message"])
                     elif msg["type"] == "agent":
@@ -140,6 +157,11 @@ async def process_query(
                     yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
 
             elapsed_ms = int((time.time() - start_time) * 1000)
+
+            # Skip DB operations if graph was cancelled (client disconnected)
+            if graph_task.cancelled():
+                logger.info("[Query] Skipping DB save — query was cancelled.")
+                return
 
             # Log query
             try:

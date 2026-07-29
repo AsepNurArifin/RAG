@@ -64,7 +64,7 @@ def get_llm(
     return ChatGroq(**kwargs)
 
 
-def invoke_with_retry(chain, input_data: dict, max_retries: int = 3, base_delay: float = 2.0):
+def invoke_with_retry(chain, input_data: dict, max_retries: int = 3, base_delay: float = 1.0):
     """
     Invoke LLM chain dengan retry untuk handle quota/rate limit errors.
 

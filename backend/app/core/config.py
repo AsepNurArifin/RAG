@@ -41,13 +41,20 @@ class Settings:
     # Docling (Docker serve)
     DOCLING_URL: str = field(default_factory=lambda: os.getenv("DOCLING_URL", "http://localhost:5001"))
 
+    # Neo4j
+    NEO4J_ENABLED: bool = field(default_factory=lambda: os.getenv("NEO4J_ENABLED", "true").lower() == "true")
+    NEO4J_DRAFT_MODE: bool = field(default_factory=lambda: os.getenv("NEO4J_DRAFT_MODE", "true").lower() == "true")
+    NEO4J_URI: str = field(default_factory=lambda: os.getenv("NEO4J_URI", "bolt://localhost:7687"))
+    NEO4J_USER: str = field(default_factory=lambda: os.getenv("NEO4J_USER", "neo4j"))
+    NEO4J_PASSWORD: str = field(default_factory=lambda: os.getenv("NEO4J_PASSWORD", "enterprisemind"))
+
     # Embedding
     EMBEDDING_MODEL: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"))
     EMBEDDING_DIMENSIONS: int = 1024
 
     # Agent Thresholds
     CONFIDENCE_THRESHOLD: float = 0.6
-    MAX_REFLECTION_ITERATIONS: int = 2
+    MAX_REFLECTION_ITERATIONS: int = 1
     QUERY_TIMEOUT_SECONDS: int = 180
 
     # Application
@@ -63,7 +70,7 @@ class Settings:
 
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = field(default_factory=lambda: _safe_int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"), "MAX_UPLOAD_SIZE_MB"))
-    EXTRACTION_TIMEOUT_SECONDS: int = field(default_factory=lambda: _safe_int(os.getenv("EXTRACTION_TIMEOUT_SECONDS", "120"), "EXTRACTION_TIMEOUT_SECONDS"))
+    EXTRACTION_TIMEOUT_SECONDS: int = field(default_factory=lambda: _safe_int(os.getenv("EXTRACTION_TIMEOUT_SECONDS", "600"), "EXTRACTION_TIMEOUT_SECONDS"))
 
     # MinIO Storage
     MINIO_ENDPOINT: str = field(default_factory=lambda: os.getenv("MINIO_ENDPOINT", "localhost:9000"))

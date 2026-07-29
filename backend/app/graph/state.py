@@ -111,6 +111,14 @@ class GraphState(TypedDict):
     Format: [{role, content, timestamp}]"""
 
     # ------------------------------------------------------------------ #
+    # Knowledge Graph Context
+    # ------------------------------------------------------------------ #
+    graph_context: str
+    """Konteks dari Knowledge Graph traversal (Neo4j).
+    Format: [GRAPH RELATIONS]\n A --[REL]--> B --[REL]--> C
+    Hanya diisi untuk intent analytical/comparison/comprehensive/ambiguous."""
+
+    # ------------------------------------------------------------------ #
     # Error Handling
     # ------------------------------------------------------------------ #
     error: str | None

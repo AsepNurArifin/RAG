@@ -86,6 +86,52 @@ def embed_and_store(chunks: list[DocumentChunk]) -> int:
         raise RuntimeError(f"Gagal embed dan simpan chunks: {e}") from e
 
 
+def _insert_parents_directly(texts: list[str], metadatas: list[dict], ids: list[str]) -> int:
+    """
+    Insert parent chunks ke Milvus TANPA embedding via PyMilvus langsung.
+
+    Menghindari LangChain Milvus.add_texts() yang selalu menjalankan embedding.
+    Juga menghindari inisialisasi AsyncMilvusClient yang gagal di thread worker.
+    Ref: OPTIMIZATION_PLAN.md P1
+    """
+    from pymilvus import connections, Collection, utility
+
+    dim = settings.EMBEDDING_DIMENSIONS
+    dummy_vector = [0.0] * dim
+
+    if not connections.has_connection("default"):
+        connections.connect(alias="default", uri=settings.MILVUS_URI)
+
+    if not utility.has_collection(settings.MILVUS_COLLECTION):
+        logger.warning("Koleksi %s belum ada, skip parent insert", settings.MILVUS_COLLECTION)
+        return 0
+
+    col = Collection(settings.MILVUS_COLLECTION)
+
+    entities = []
+    for text, meta, eid in zip(texts, metadatas, ids):
+        entities.append({
+            "text": text,
+            "vector": dummy_vector,
+            "pk": eid,
+            "chunk_type": meta.get("chunk_type", "parent"),
+            "filename": meta.get("filename", ""),
+            "page_number": meta.get("page_number", 0),
+            "document_id": meta.get("document_id", ""),
+            "parent_id": meta.get("parent_id", ""),
+            "chunk_index": meta.get("chunk_index", 0),
+        })
+
+    try:
+        col.insert(entities)
+        col.flush()
+        logger.info("Inserted %d parent chunks ke Milvus (tanpa embedding).", len(entities))
+        return len(entities)
+    except Exception as e:
+        logger.warning("Gagal insert parent chunks: %s", e)
+        return 0
+
+
 def embed_and_store_parent_child(
     parent_chunks: list[DocumentChunk],
     child_chunks: list[DocumentChunk],
@@ -108,15 +154,14 @@ def embed_and_store_parent_child(
     # Store parent chunks (tidak di-embed, hanya disimpan untuk lookup)
     if parent_chunks:
         parent_texts = [chunk.content for chunk in parent_chunks]
-        parent_metadatas = [chunk.metadata for chunk in parent_chunks]
+        parent_metadatas = [{**chunk.metadata, "child_id": ""} for chunk in parent_chunks]
         parent_ids = [
-            f"{meta.get('filename', 'unknown')}__parent_{meta.get('chunk_index', i)}"
+            meta.get('parent_id', f"{meta.get('filename', 'unknown')}__parent_{meta.get('chunk_index', i)}")
             for i, meta in enumerate(parent_metadatas)
         ]
 
         try:
-            store.add_texts(texts=parent_texts, metadatas=parent_metadatas, ids=parent_ids)
-            logger.info("Stored %d parent chunks ke vector store.", len(parent_chunks))
+            _insert_parents_directly(parent_texts, parent_metadatas, parent_ids)
         except Exception as e:
             logger.warning("Gagal store parent chunks: %s", e)
 

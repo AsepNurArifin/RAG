@@ -85,3 +85,14 @@ CREATE TABLE IF NOT EXISTS chunk_hashes (
     document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- graph_drafts: pending entity/relationship extractions untuk review sebelum commit ke Neo4j
+CREATE TABLE IF NOT EXISTS graph_drafts (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    draft_data JSONB NOT NULL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'committed')),
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);

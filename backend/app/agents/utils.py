@@ -8,7 +8,7 @@ untuk formatting dokumen, history, dan data lainnya.
 
 def format_documents_for_prompt(
     documents: list[dict],
-    max_chars: int = 1500,
+    max_chars: int = 2500,
     include_date: bool = True,
 ) -> str:
     """
@@ -24,11 +24,12 @@ def format_documents_for_prompt(
     """
     parts = []
     for i, doc in enumerate(documents, 1):
-        source = doc.get("source", doc.get("filename", "unknown"))
-        content = doc.get("content", "")[:max_chars]
+        source = _get_field(doc, "source") or _get_field(doc, "filename") or "unknown"
+        content = _get_field(doc, "content") or ""
+        content = content[:max_chars]
 
         if include_date:
-            date = doc.get("date", doc.get("upload_date", "N/A")) or "N/A"
+            date = _get_field(doc, "date") or _get_field(doc, "upload_date") or "N/A"
             parts.append(
                 f"[Dokumen {i}] (Sumber: {source}, Tanggal: {date})\n"
                 f"{content}\n"
@@ -37,6 +38,19 @@ def format_documents_for_prompt(
             parts.append(f"[Dokumen {i}] (Sumber: {source})\n{content}\n")
 
     return "\n".join(parts)
+
+
+def _get_field(doc: dict, field: str) -> str | None:
+    """Get field from doc dict, checking both top-level and nested metadata."""
+    value = doc.get(field)
+    if value:
+        return str(value)
+    metadata = doc.get("metadata", {})
+    if isinstance(metadata, dict):
+        value = metadata.get(field)
+        if value:
+            return str(value)
+    return None
 
 
 def format_conversation_history(history: list[dict], max_messages: int = 5) -> str:

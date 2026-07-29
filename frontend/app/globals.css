@@ -6,3 +6,43 @@
 @import "tw-animate-css";
 
 @import "shadcn/tailwind.css";
+
+/* Markdown Table Styling */
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.prose thead {
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.prose th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.prose td {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  vertical-align: top;
+}
+
+.prose tbody tr:hover {
+  background-color: #f8fafc;
+  transition: background-color 0.2s ease;
+}
+
+.prose tbody tr:last-child td {
+  border-bottom: 1px solid #e2e8f0;
+}

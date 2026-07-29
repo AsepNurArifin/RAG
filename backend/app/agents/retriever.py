@@ -20,10 +20,20 @@ from app.ingestion.embedder import get_vector_store
 logger = logging.getLogger(__name__)
 
 # Final top-k after reranking (before parent resolution)
-RERANK_TOP_K = 5
+RERANK_TOP_K = 10
 
-# Maximum parents to send to LLM
-MAX_PARENTS = 7
+# Maximum parents to send to LLM (dynamic based on intent)
+MAX_PARENTS_BY_INTENT = {
+    "simple_factual": 5,
+    "factual": 7,
+    "informational": 10,
+    "comparison": 15,
+    "comprehensive": 15,
+    "exploratory": 12,
+    "analytical": 12,
+    "procedural": 10,
+}
+DEFAULT_MAX_PARENTS = 7
 
 
 def adaptive_top_k(
@@ -79,19 +89,35 @@ def _build_parent_store(parent_ids: list[str]) -> dict[str, dict]:
         ids_str = ", ".join(f'"{pid}"' for pid in parent_ids)
         expr = f"parent_id in [{ids_str}]"
 
+        # Query fields yang ADA di schema (bukan "metadata" yang tidak ada)
+        query_fields = ["text", "parent_id", "child_id", "chunk_type", 
+                        "filename", "page_number", "document_id", 
+                        "chunk_index", "extraction_method"]
+
         store.col.load()
         results = store.col.query(
             expr=expr,
-            output_fields=["text", "metadata", "parent_id"]
+            output_fields=query_fields
         )
 
         parent_store = {}
         for doc in results:
-            pid = doc.get("parent_id") or doc.get("metadata", {}).get("parent_id")
+            pid = doc.get("parent_id")
             if pid:
+                # Build metadata dict dari individual fields
+                metadata = {
+                    "parent_id": pid,
+                    "child_id": doc.get("child_id", ""),
+                    "chunk_type": doc.get("chunk_type", ""),
+                    "filename": doc.get("filename", ""),
+                    "page_number": doc.get("page_number", 0),
+                    "document_id": doc.get("document_id", ""),
+                    "chunk_index": doc.get("chunk_index", 0),
+                    "extraction_method": doc.get("extraction_method", ""),
+                }
                 parent_store[pid] = {
                     "content": doc.get("text", ""),
-                    "metadata": doc.get("metadata", {}),
+                    "metadata": metadata,
                     "parent_id": pid,
                 }
 
@@ -138,6 +164,27 @@ def run_retriever_agent(state: GraphState) -> GraphState:
             logger.warning("[Retriever] Tidak ditemukan dokumen relevan untuk: '%s...'", query[:60])
             return {**state, "retrieved_documents": []}
 
+        # Step 3b: Graph traversal (kondisional — hanya untuk intent tertentu)
+        graph_context = None
+        if intent_type in ("analytical", "comparison", "comprehensive", "ambiguous"):
+            try:
+                from app.retrieval.graph_traversal import (
+                    extract_entities_from_query,
+                    find_entity_paths,
+                    format_paths_for_context,
+                )
+                query_entities = extract_entities_from_query(query)
+                if query_entities:
+                    paths = find_entity_paths(query_entities, max_depth=3)
+                    graph_context = format_paths_for_context(paths)
+                    if graph_context:
+                        logger.info(
+                            "[Retriever] Graph context ditambahkan: %d path untuk %s",
+                            len(paths), query_entities,
+                        )
+            except Exception as e:
+                logger.warning("[Retriever] Graph traversal gagal (fallback): %s", e)
+
         # Step 4: Rerank → ambil top RERANK_TOP_K
         reranked = rerank_chunks(query=query, chunks=candidates, top_k=RERANK_TOP_K)
 
@@ -146,15 +193,33 @@ def run_retriever_agent(state: GraphState) -> GraphState:
 
         if parent_ids:
             parent_store = _build_parent_store(parent_ids)
+
+            # Attach relevance/reranker scores from best child to each parent
+            for child in reranked:
+                pid = child.get("metadata", {}).get("parent_id") or child.get("parent_id")
+                if pid and pid in parent_store:
+                    child_relevance = child.get("relevance_score", 0)
+                    child_reranker = child.get("reranker_score", 0)
+                    if child_relevance > parent_store[pid].get("relevance_score", 0):
+                        parent_store[pid]["relevance_score"] = child_relevance
+                    if child_reranker > parent_store[pid].get("reranker_score", 0):
+                        parent_store[pid]["reranker_score"] = child_reranker
+
             results = resolve_and_deduplicate_parents(reranked, parent_store)
 
-            # Limit ke MAX_PARENTS
-            if len(results) > MAX_PARENTS:
-                results = results[:MAX_PARENTS]
+            # Get dynamic max_parents based on intent
+            max_parents = MAX_PARENTS_BY_INTENT.get(intent_type, DEFAULT_MAX_PARENTS)
+
+            # Sort by reranker_score sebelum limit ke max_parents
+            results.sort(key=lambda x: x.get("reranker_score", 0), reverse=True)
+            
+            # Limit ke max_parents
+            if len(results) > max_parents:
+                results = results[:max_parents]
 
             logger.info(
-                "[Retriever] %d children → %d unique parents (max %d)",
-                len(reranked), len(results), MAX_PARENTS,
+                "[Retriever] %d children → %d unique parents (max %d for %s)",
+                len(reranked), len(results), max_parents, intent_type,
             )
         else:
             # Fallback: tidak ada parent_id, gunakan reranked langsung
@@ -162,12 +227,17 @@ def run_retriever_agent(state: GraphState) -> GraphState:
             logger.info("[Retriever] No parent_ids found, using reranked chunks directly")
 
         logger.info(
-            "[Retriever] Final: %d dokumen. Top reranker_score: %.4f",
+            "[Retriever] Final: %d dokumen. Top reranker_score: %.4f, Top relevance_score: %.4f",
             len(results),
-            results[0].get("reranker_score", 0) if results else 0,
+            max(r.get("reranker_score", 0) for r in results) if results else 0,
+            max(r.get("relevance_score", 0) for r in results) if results else 0,
         )
     except Exception as e:
         logger.exception("[Retriever] Error saat retrieval: %s", e)
         results = []
 
-    return {**state, "retrieved_documents": results}
+    return {
+        **state,
+        "retrieved_documents": results,
+        "graph_context": graph_context or "",
+    }

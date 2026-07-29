@@ -48,5 +48,15 @@
   "wbk": ["wilayah bebas dari korupsi", "corruption-free zone"],
   "wbbm": ["wilayah birokrasi bersih dan melayani", "clean and serving bureaucracy zone"],
   "sakip": ["sistem akuntabilitas kinerja instansi pemerintah"],
-  "lkd": ["laboratorium kecerdasan digital", "digital intelligence laboratory"]
+  "lkd": ["laboratorium kecerdasan digital", "digital intelligence laboratory"],
+  "cca": ["core competency analysis", "analisis kompetensi inti"],
+  "dna": ["developmental needs analysis", "analisis kebutuhan pengembangan"],
+  "tna": ["training needs analysis", "analisis kebutuhan pelatihan"],
+  "lnd": ["learning needs diagnostic", "diagnostik kebutuhan pembelajaran"],
+  "lvc": ["learning value chain", "rantai nilai pembelajaran"],
+  "lna": ["learning needs analysis", "analisis kebutuhan pembelajaran"],
+  "bna": ["business needs analysis", "analisis kebutuhan bisnis"],
+  "pna": ["performance needs analysis", "analisis kebutuhan kinerja"],
+  "cna": ["competency needs analysis", "analisis kebutuhan kompetensi"],
+  "ina": ["instructional needs analysis", "analisis kebutuhan instruksional"]
 }

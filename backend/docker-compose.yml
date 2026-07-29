@@ -147,6 +147,30 @@ services:
     networks:
       - enterprisemind_net
 
+  neo4j:
+    image: neo4j:5-community
+    container_name: enterprisemind_neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/enterprisemind
+      - NEO4J_server_memory_heap_max__size=512M
+      - NEO4J_server_memory_pagecache_size=256M
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "enterprisemind", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
+
 volumes:
   milvus_etcd:
     driver: local
@@ -157,6 +181,10 @@ volumes:
   temporal_data:
     driver: local
   docling_models:
+    driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
     driver: local
 
 networks:
