@@ -41,6 +41,9 @@ class Settings:
     # Docling (Docker serve)
     DOCLING_URL: str = field(default_factory=lambda: os.getenv("DOCLING_URL", "http://localhost:5001"))
 
+    # Temporal
+    TEMPORAL_HOST: str = field(default_factory=lambda: os.getenv("TEMPORAL_HOST", "localhost:7233"))
+
     # Neo4j
     NEO4J_ENABLED: bool = field(default_factory=lambda: os.getenv("NEO4J_ENABLED", "true").lower() == "true")
     NEO4J_DRAFT_MODE: bool = field(default_factory=lambda: os.getenv("NEO4J_DRAFT_MODE", "true").lower() == "true")

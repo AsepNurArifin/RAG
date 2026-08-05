@@ -4,21 +4,17 @@ import { QueryResponse, Document, Session, Metrics, UserData, Message } from "..
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 /**
- * Get auth token from localStorage.
+ * Auth is handled by httpOnly cookie (emind_token) set by the backend.
+ * No token in localStorage, no Authorization header needed.
  */
 function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== "undefined" ? localStorage.getItem("emind_token") : null;
-  const headers: Record<string, string> = {
+  return {
     "Content-Type": "application/json",
   };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
 }
 
 /**
- * Authenticated fetch wrapper. Adds JWT token automatically.
+ * Authenticated fetch wrapper. Uses httpOnly cookie auth (credentials: "include").
  * Uses same-origin proxy (next.config.ts rewrites) to avoid CORS issues.
  */
 async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -29,8 +25,8 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
     delete headers["Content-Type"];
   }
 
-  // Bearer token handles auth — no cookie needed
-  return fetch(url, { ...options, headers });
+  // httpOnly cookie sent automatically; "include" ensures cross-origin cookies work
+  return fetch(url, { ...options, headers, credentials: "include" });
 }
 
 export const api = {

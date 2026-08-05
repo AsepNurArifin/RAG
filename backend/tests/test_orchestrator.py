@@ -1,13 +1,12 @@
-import pytest
-from app.agents.orchestrator import run_orchestrator_agent
+from app.agents.orchestrator import run_orchestrator_agent, INTENT_MAP
 from app.graph.state import GraphState
-from langchain_core.messages import AIMessage
 
-def test_orchestrator_informational(mock_llm):
-    state = GraphState(
-        query="Berapa hari cuti tahunan?",
+
+def _make_state(query: str, intent: str = "") -> GraphState:
+    return GraphState(
+        query=query,
         session_id="test_session",
-        intent="",
+        intent=intent,
         agents_to_activate=[],
         orchestrator_reasoning="",
         retrieved_documents=[],
@@ -23,12 +22,41 @@ def test_orchestrator_informational(mock_llm):
         conversation_history=[],
         error=None,
     )
-    
-    # We mock the ChatGroq model to return a structured output message
-    mock_llm.invoke.return_value = AIMessage(content='{"intent": "informational", "agents_to_activate": ["researcher"], "reasoning": "Needs to search the policy documents for annual leave."}')
-    
+
+
+def test_orchestrator_factual_to_informational():
+    """Query faktual (sesuai rule classifier) → intent informational + researcher."""
+    state = _make_state("Berapa hari cuti tahunan?")
     new_state = run_orchestrator_agent(state)
-    
+
     assert new_state["intent"] == "informational"
     assert "researcher" in new_state["agents_to_activate"]
-    assert new_state["orchestrator_reasoning"] == "Needs to search the policy documents for annual leave."
+
+
+def test_orchestrator_action_request():
+    """Query aksi → intent action_request + executor."""
+    state = _make_state("tolong buatkan ringkasan laporan minggu ini")
+    new_state = run_orchestrator_agent(state)
+
+    assert new_state["intent"] == "action_request"
+    assert "executor" in new_state["agents_to_activate"]
+
+
+def test_orchestrator_greeting_to_out_of_scope():
+    """Query sapaan → out_of_scope, hanya summarizer."""
+    state = _make_state("halo")
+    new_state = run_orchestrator_agent(state)
+
+    assert new_state["intent"] == "out_of_scope"
+    assert "summarizer" in new_state["agents_to_activate"]
+    assert "researcher" not in new_state["agents_to_activate"]
+
+
+def test_intent_map_complete():
+    """Semua raw intent dari classifier punya mapping ke format orchestrator."""
+    raw_intents = [
+        "greeting", "factual", "comprehensive", "analytical",
+        "procedural", "comparison", "action_request", "out_of_scope", "ambiguous",
+    ]
+    for raw in raw_intents:
+        assert raw in INTENT_MAP, f"Intent '{raw}' belum ter-mapping"

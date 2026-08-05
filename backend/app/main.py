@@ -29,7 +29,7 @@ logging.basicConfig(
 )
 # Disable verbose logging from noisy libraries
 logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("chromadb").setLevel(logging.WARNING)
+logging.getLogger("pymilvus").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -180,9 +180,5 @@ if __name__ == "__main__":
         "app.main:app",
         host=settings.APP_HOST,
         port=settings.APP_PORT,
-        reload=True,
+        reload=(settings.APP_ENV == "development"),
     )
-
-# Trigger reload
-
-# Trigger reload 2

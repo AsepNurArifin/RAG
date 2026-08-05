@@ -89,7 +89,12 @@ async def logout(response: Response, user: dict = Depends(get_current_user)):
         current_version + 1, str(user["id"]),
     )
 
-    response.delete_cookie(key="emind_token", httponly=True, secure=True, samesite="lax")
+    response.delete_cookie(
+        key="emind_token",
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+    )
     return {"message": "Berhasil logout."}
 
 

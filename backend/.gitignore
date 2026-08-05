@@ -43,7 +43,6 @@ build/
 # ============================================
 
 # Debug/test scripts (dibuat saat development)
-test_*.py
 diag_test.py
 test_debug_pipeline.py
 test_hybrid_extractor.py

@@ -6,6 +6,38 @@
 
 ---
 
+## 0. Production Readiness Fix (2026-08-05)
+
+Perubahan untuk menghilangkan pemblokir produksi dan hardening keamanan.
+
+### Keamanan & Auth
+- **ADR-012**: Migrasi autentikasi frontend dari JWT di `localStorage` + header Bearer → **httpOnly cookie murni**. Semua fetch memakai `credentials: "include"`; token state dihapus dari `AuthContext` dan `api.ts`.
+- Hapus sentinel mock `"cookie-session"` di `AuthContext`.
+- Backend `delete_cookie` kini mengikuti `secure` sesuai environment (dev HTTP logout berfungsi).
+
+### Database
+- Tulis ulang `supabase_migration.sql` agar 100% sinkron dengan `app/db/schema.sql` (sumber kebenaran): kolom `password_hash`, role `('admin','analyst','viewer')`, `session_id`, tabel `chunk_hashes` & `graph_drafts`. Idempotent (`CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ADD COLUMN IF NOT EXISTS`).
+- `schema.sql`: tambah kolom `department` & `clearance_level` (dibaca oleh `core/auth.py`).
+
+### Backend Fixes
+- **Circular import** di `app/graph/__init__.py` (eager-import `build_graph`) dihapus — aplikasi kini bisa di-import tanpa error.
+- `reload=True` di `main.py` → hanya aktif di `APP_ENV=development`.
+- `TEMPORAL_HOST` dipindah dari `os.getenv` langsung ke `Settings` (`config.py`) — Single Source of Truth.
+- Silent exception di `core/auth.py`, `temporal/workflows.py`, `api/sessions.py` kini di-log.
+- Hapus dead code `app/ingestion/extractor_hybrid_backup.py` (563 baris) & jejak ChromaDB di `main.py`/`docker-compose.yml`.
+
+### Tests
+- `conftest.py`: hapus fixture `mock_supabase` yang rusak → `mock_db` (postgres_client).
+- `test_auth.py`, `test_tools.py`, `test_orchestrator.py`, `test_verifier.py`, `test_ingestion.py` disinkronkan dengan kode aktual.
+- Tambah `test_smoke.py` (4 test) & `test_orchestrator` case coverage.
+- **Total: 50 test lulus** (sebelumnya import error).
+
+### Config & Docs
+- `.env.example`: ganti `GOOGLE_API_KEY` → `GROQ_API_KEY` (+ model fast/reasoning), tambah `NEO4J_*`, `CHUNK_*`, `MAX_UPLOAD_SIZE_MB`, `EXTRACTION_TIMEOUT_SECONDS`, peringatan ganti `JWT_SECRET_KEY`.
+- `SECURITY.md` bagian 6 (Session Management) & `DECISION_LOG.md` ADR-012.
+
+---
+
 ## Daftar Isi
 
 1. [File Baru yang Dibuat](#1-file-baru-yang-dibuat)

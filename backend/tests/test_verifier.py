@@ -1,4 +1,3 @@
-import pytest
 from app.agents.verifier import run_verifier_agent
 from app.graph.state import GraphState
 
@@ -34,6 +33,7 @@ def test_verifier_logic(mock_llm):
     
     new_state = run_verifier_agent(state)
     
-    assert new_state["confidence_score"] == 0.96
+    # 0.55*0.95 + 0.30*(0.95/0.5 capped 1.0) + 0.15*(3/3) - 0 = 0.9725 -> round 0.97
+    assert new_state["confidence_score"] == 0.97
     assert len(new_state["verified_claims"]) == 1
     assert new_state["needs_reflection"] is False

@@ -62,13 +62,15 @@ async def get_session_messages(
         if isinstance(row.get("citations"), str):
             try:
                 row["citations"] = json.loads(row["citations"])
-            except Exception:
+            except Exception as e:
+                logger.warning("Gagal parse citations JSONB (id=%s): %s", row.get("id"), e)
                 row["citations"] = []
                 
         if isinstance(row.get("action_items"), str):
             try:
                 row["action_items"] = json.loads(row["action_items"])
-            except Exception:
+            except Exception as e:
+                logger.warning("Gagal parse action_items JSONB (id=%s): %s", row.get("id"), e)
                 row["action_items"] = []
                 
     return rows

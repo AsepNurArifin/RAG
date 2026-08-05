@@ -48,6 +48,8 @@ CREATE TABLE users (
     role TEXT DEFAULT 'viewer' CHECK (role IN ('admin', 'analyst', 'viewer')),
     is_active BOOLEAN DEFAULT true,
     token_version INTEGER DEFAULT 1,
+    department TEXT,
+    clearance_level INTEGER DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -1,5 +1,5 @@
 # EnterpriseMind AI — Docker Compose
-# ChromaDB + Temporal (dengan PostgreSQL internal)
+# Milvus (Vector DB) + Temporal (dengan PostgreSQL internal)
 # Backend + Application PostgreSQL run locally
 #
 # Usage:

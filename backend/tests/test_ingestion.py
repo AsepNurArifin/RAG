@@ -121,59 +121,20 @@ class TestExtractor:
         with pytest.raises(ValueError, match="tidak didukung"):
             detect_file_type("image.png")
 
-    def test_classify_visual_page_table(self):
-        """Harus mengklasifikasikan halaman dengan grid horizontal/vertikal sebagai table_data."""
-        from app.ingestion.extractor import classify_visual_page
-        
-        mock_page = MagicMock()
-        # Mock 4 horizontal lines and 3 vertical lines
-        mock_lines = []
-        for _ in range(4):
-            mock_lines.append({
-                "type": "l",
-                "items": [("l", MagicMock(y=10), MagicMock(y=10))] # horizontal
-            })
-        for _ in range(3):
-            mock_lines.append({
-                "type": "l",
-                "items": [("l", MagicMock(x=10), MagicMock(x=10))] # vertical
-            })
-        
-        mock_page.get_drawings.return_value = mock_lines
-        mock_page.get_text.return_value = {"blocks": []} # no text
-        mock_page.rect = MagicMock(width=100, height=100)
-        
-        assert classify_visual_page(mock_page) == "table_data"
+    def test_detect_table_pages_empty(self):
+        """File PDF tanpa tabel → list kosong."""
+        from app.ingestion.extractor import _detect_table_pages
 
-    def test_classify_visual_page_diagram(self):
-        """Harus mengklasifikasikan halaman dengan banyak bentuk non-grid sebagai diagram_only."""
-        from app.ingestion.extractor import classify_visual_page
-        
-        mock_page = MagicMock()
-        # Mock 15 arbitrary shapes (not horizontal/vertical lines)
-        mock_drawings = [{"type": "c"} for _ in range(15)]
-        
-        mock_page.get_drawings.return_value = mock_drawings
-        mock_page.get_text.return_value = {"blocks": []} # no text
-        mock_page.rect = MagicMock(width=100, height=100)
-        
-        assert classify_visual_page(mock_page) == "diagram_only"
+        # Tidak ada tabel → find_tables() mengembalikan list kosong
+        with patch("pymupdf.open") as mock_open:
+            mock_doc = MagicMock()
+            mock_page = MagicMock()
+            mock_page.find_tables.return_value.tables = []
+            mock_doc.__iter__.return_value = iter([mock_page])
+            mock_open.return_value = mock_doc
 
-    def test_classify_visual_page_scan(self):
-        """Harus mengklasifikasikan halaman dengan rasio teks rendah sebagai scan."""
-        from app.ingestion.extractor import classify_visual_page
-        
-        mock_page = MagicMock()
-        mock_page.get_drawings.return_value = [] # no shapes
-        # text area very small compared to page area
-        mock_page.get_text.return_value = {
-            "blocks": [
-                {"type": 0, "bbox": [0, 0, 2, 2]} # 4 sq px area
-            ]
-        }
-        mock_page.rect = MagicMock(width=100, height=100) # 10000 sq px area -> ratio = 4/10000 = 0.0004 < 0.1
-        
-        assert classify_visual_page(mock_page) == "scan"
+            result = _detect_table_pages(Path("dummy.pdf"))
+            assert result == []
 
     def test_strip_watermarks(self):
         """Harus menghapus URL, IP, hak cipta, dan kata watermark dari teks."""

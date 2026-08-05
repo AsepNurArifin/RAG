@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, AsyncMock
 
 from app.tools.calculator_tool import calculate
 from app.tools.web_search_tool import _sanitize_content
@@ -70,29 +70,30 @@ class TestWebSearch:
 
 
 class TestMetadataQuery:
-    @patch("app.tools.metadata_query_tool.get_supabase_client")
-    def test_returns_documents(self, mock_client):
-        mock_client.return_value.table.return_value.select.return_value.execute.return_value.data = [
+    @pytest.mark.asyncio
+    @patch("app.tools.metadata_query_tool.fetch_all", new_callable=AsyncMock)
+    async def test_returns_documents(self, mock_fetch_all):
+        mock_fetch_all.return_value = [
             {"filename": "test.pdf", "category": "reports", "created_at": "2026-01-01"}
         ]
-        result = query_document_metadata()
+        result = await query_document_metadata()
         assert len(result) == 1
         assert result[0]["filename"] == "test.pdf"
 
-    @patch("app.tools.metadata_query_tool.get_supabase_client")
-    def test_returns_empty_list_on_error(self, mock_client):
-        mock_client.return_value.table.side_effect = Exception("DB down")
-        result = query_document_metadata()
+    @pytest.mark.asyncio
+    @patch("app.tools.metadata_query_tool.fetch_all", new_callable=AsyncMock)
+    async def test_returns_empty_list_on_error(self, mock_fetch_all):
+        mock_fetch_all.side_effect = Exception("DB down")
+        result = await query_document_metadata()
         assert len(result) == 1
         assert "error" in result[0]
 
-    @patch("app.tools.metadata_query_tool.get_supabase_client")
-    def test_filters_by_category(self, mock_client):
-        mock_query = MagicMock()
-        mock_client.return_value.table.return_value.select.return_value = mock_query
-        mock_query.eq.return_value = mock_query
-        mock_query.execute.return_value.data = []
-
-        query_document_metadata(category_filter="reports")
-
-        mock_query.eq.assert_called_once_with("category", "reports")
+    @pytest.mark.asyncio
+    @patch("app.tools.metadata_query_tool.fetch_all", new_callable=AsyncMock)
+    async def test_filters_by_category(self, mock_fetch_all):
+        mock_fetch_all.return_value = []
+        await query_document_metadata(category_filter="reports")
+        actual_args = mock_fetch_all.call_args.args[0]
+        assert "WHERE category = $1" in actual_args
+        assert "ORDER BY created_at DESC" in actual_args
+        assert mock_fetch_all.call_args.args[1] == "reports"

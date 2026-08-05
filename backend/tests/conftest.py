@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from langchain_core.messages import AIMessage
 
 @pytest.fixture
@@ -20,17 +20,30 @@ def mock_llm(monkeypatch):
     return mock_chatgroq
 
 @pytest.fixture
-def mock_supabase(monkeypatch):
-    """Mock the Supabase client."""
-    mock_client = MagicMock()
-    
-    # Mocking basic query responses
-    mock_query = MagicMock()
-    mock_query.execute.return_value.data = [{"id": "mock_id", "email": "test@example.com", "role": "admin", "is_active": True, "password_hash": b"hash"}]
-    mock_client.table().select().eq.return_value = mock_query
-    
-    def get_mock_supabase():
-        return mock_client
-        
-    monkeypatch.setattr("app.core.supabase_client.get_supabase_client", get_mock_supabase)
-    return mock_client
+def mock_db(monkeypatch):
+    """Mock the asyncpg postgres_client functions."""
+    mock_fetch_one = AsyncMock(return_value={
+        "id": "123",
+        "email": "test@example.com",
+        "full_name": "Test User",
+        "role": "user",
+        "is_active": True,
+        "token_version": 1,
+        "department": "",
+        "clearance_level": 1,
+    })
+    mock_fetch_all = AsyncMock(return_value=[])
+    mock_execute = AsyncMock(return_value="UPDATE 1")
+    mock_fetch_val = AsyncMock(return_value=None)
+
+    monkeypatch.setattr("app.core.postgres_client.fetch_one", mock_fetch_one)
+    monkeypatch.setattr("app.core.postgres_client.fetch_all", mock_fetch_all)
+    monkeypatch.setattr("app.core.postgres_client.execute_query", mock_execute)
+    monkeypatch.setattr("app.core.postgres_client.fetch_val", mock_fetch_val)
+
+    return {
+        "fetch_one": mock_fetch_one,
+        "fetch_all": mock_fetch_all,
+        "execute_query": mock_execute,
+        "fetch_val": mock_fetch_val,
+    }

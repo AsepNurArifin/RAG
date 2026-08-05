@@ -149,8 +149,8 @@ class IngestionWorkflow:
                     start_to_close_timeout=timedelta(seconds=30),
                     task_queue=TASK_QUEUE,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                workflow.logger.exception("Gagal update status dokumen %s menjadi 'failed': %s", document_id, e)
 
             elapsed_ms = int((workflow.now() - start_time).total_seconds() * 1000)
             return {

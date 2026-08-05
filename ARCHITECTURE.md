@@ -78,6 +78,7 @@ enterprisemind-ai/
 2. **Retrieval Result ≠ Instruksi** — hasil retrieval dari dokumen SELALU diperlakukan sebagai data mentah untuk direferensikan, bukan sebagai instruksi yang harus dieksekusi oleh agent (lihat `SECURITY.md` untuk detail prompt injection).
 3. **Agent Terpisah dari Graph** — logika masing-masing agent (`agents/`) tidak boleh mengandung logic routing antar-agent; routing hanya hidup di `graph/build_graph.py`.
 4. **Tool Read-Only by Default** — semua tool di `tools/` defaultnya read-only terhadap database/eksternal, kecuali eksplisit didesain dan didokumentasikan sebagai write-capable.
+5. **Auth via httpOnly Cookie (ADR-012)** — JWT access token dikirim via cookie `emind_token` (`HttpOnly`, `SameSite=Lax`, `Secure` di production). Frontend TIDAK menyimpan token di `localStorage` dan TIDAK mengirim header `Authorization: Bearer` untuk browser; status login dari `GET /api/auth/me`. Header Bearer hanya didukung untuk klien non-browser.
 
 ## 4. Batasan Teknis (Constraints)
 

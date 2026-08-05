@@ -45,7 +45,17 @@ Meskipun proyek ini menggunakan data publik/sintetis (bukan data perusahaan riil
 - Dokumen yang diupload tidak dikirim ke pihak ketiga selain provider LLM yang digunakan untuk inference (Groq).
 - Jika dataset sintetis mengandung nama/data yang menyerupai orang riil, pastikan itu jelas fiktif untuk menghindari kebingungan saat demo.
 
-## 6. Checklist Pre-Deploy
+## 6. Session Management (JWT via httpOnly Cookie)
+
+**Aturan wajib (ADR-012):**
+- JWT access token TIDAK boleh disimpan di `localStorage`/`sessionStorage` frontend — simpan sebagai **httpOnly cookie** (`emind_token`) yang di-set oleh backend saat login.
+- Frontend TIDAK boleh mengirim header `Authorization: Bearer` untuk autentikasi browser; gunakan `credentials: "include"` agar cookie terkirim otomatis.
+- Cookie diset dengan flag `HttpOnly`, `SameSite=Lax` (production juga `Secure`).
+- `GET /api/auth/me` adalah satu-satunya sumber kebenaran status login di frontend.
+- Header `Authorization: Bearer` tetap didukung backend untuk klien non-browser (script/curl), TAPI tidak untuk browser.
+- Saat logout, `token_version` di-increment (invalidasi semua token lama) dan cookie dihapus.
+
+## 7. Checklist Pre-Deploy
 
 - [ ] `.env` tidak ter-commit ke git (cek riwayat commit, bukan hanya `.gitignore` saat ini)
 - [ ] Rate limiting aktif di endpoint publik

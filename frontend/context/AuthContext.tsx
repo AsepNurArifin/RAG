@@ -7,12 +7,11 @@ interface User {
   id: string;
   email: string;
   full_name: string;
-  role: "admin" | "user";
+  role: "admin" | "analyst" | "viewer";
 }
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
@@ -26,81 +25,72 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
-  // Check for existing session on mount via /api/auth/me
+  // Check for existing session on mount via /api/auth/me.
+  // Auth state comes from the httpOnly cookie set by the backend — no localStorage.
   useEffect(() => {
-    const storedToken = localStorage.getItem("emind_token");
-    fetch(`${API_BASE_URL}/auth/me`, {
-      headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
-    })
+    fetch(`${API_BASE_URL}/auth/me`, { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error("No session");
         return res.json();
       })
-      .then((userData) => {
-        setUser(userData);
-        setToken("cookie-session"); // Mock token to bypass !token checks
-      })
+      .then((userData) => setUser(userData))
       .catch(() => {
-        // No valid session
-        setToken(null);
         setUser(null);
         if (pathname !== "/login") {
           router.push("/login");
         }
       })
       .finally(() => setIsLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Redirect to login if not authenticated (except on /login page)
   useEffect(() => {
-    if (!isLoading && !token && pathname !== "/login") {
+    if (!isLoading && !user && pathname !== "/login") {
       router.push("/login");
     }
-  }, [isLoading, token, pathname, router]);
+  }, [isLoading, user, pathname, router]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      console.error("[Login] Error:", response.status, error);
-      throw new Error(error.detail || "Login gagal.");
-    }
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        console.error("[Login] Error:", response.status, error);
+        throw new Error(error.detail || "Login gagal.");
+      }
 
-    const data = await response.json();
-    localStorage.setItem("emind_token", data.access_token);
-    setToken(data.access_token);
-    setUser(data.user);
+      const data = await response.json();
+      setUser(data.user);
 
-    if (data.user.role === "admin") {
-      router.push("/admin");
-    } else {
-      router.push("/");
-    }
-  }, [router]);
+      if (data.user.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
+    },
+    [router]
+  );
 
   const logout = useCallback(async () => {
     try {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("emind_token") || ""}`,
-        },
+        credentials: "include",
       });
     } catch (err) {
       console.error("Logout failed", err);
     }
-    localStorage.removeItem("emind_token");
-    setToken(null);
     setUser(null);
     router.push("/login");
   }, [router]);
@@ -109,8 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        token,
-        isAuthenticated: !!token,
+        isAuthenticated: !!user,
         isAdmin: user?.role === "admin",
         isLoading,
         login,

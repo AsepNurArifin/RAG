@@ -116,6 +116,19 @@
 
 ---
 
+### ADR-012 — Migrasi Autentikasi ke httpOnly Cookie (tanpa localStorage)
+**Tanggal:** 2026-08-05
+**Status:** Diterima
+**Konteks:** Frontend menyimpan JWT access token di `localStorage` dan mengirim header `Authorization: Bearer`, sementara backend sudah menyetel httpOnly cookie `emind_token` saat login. Menyimpan token di `localStorage` membuka celah XSS: penyerang yang berhasil menjalankan skrip di halaman bisa membaca token dan mengakses akun hingga token kedaluwarsa. Sentinel mock `"cookie-session"` di `AuthContext` juga berpotensi menutupi bug auth.
+**Keputusan:**
+1. Frontend menghapus seluruh penggunaan `localStorage` untuk token; auth state diperoleh dari `GET /api/auth/me` (cookie dikirim otomatis).
+2. Semua `fetch` memakai `credentials: "include"`.
+3. Header `Authorization: Bearer` dihapus dari `lib/api.ts` — auth murni via cookie.
+4. Backend `delete_cookie` disamakan dengan `set_cookie` (hanya `secure` di production) agar logout berfungsi di dev HTTP.
+**Konsekuensi:** Token tidak bisa dicuri via XSS. Trade-off: klien non-browser (curl/script) tidak lagi dapat autentikasi via cookie; untuk kasus tersebut `get_current_user` masih mendukung header `Authorization: Bearer` sebagai fallback. `LoginResponse` tetap menyertakan `access_token` di body untuk kompatibilitas klien non-browser.
+
+---
+
 *Template untuk entri baru:*
 ```
 ### ADR-XXX — [Judul Keputusan]

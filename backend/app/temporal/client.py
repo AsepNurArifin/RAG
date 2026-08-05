@@ -4,14 +4,14 @@ Temporal Client Helper — EnterpriseMind AI.
 Helper functions for starting Temporal workflows from FastAPI.
 """
 import logging
-import os
 import uuid
 
 from temporalio.client import Client
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "localhost:7233")
 TASK_QUEUE = "enterprisemind-ingestion"
 
 _client = None
@@ -21,8 +21,8 @@ async def get_temporal_client() -> Client:
     """Get or create Temporal client (singleton)."""
     global _client
     if _client is None:
-        logger.info("Connecting to Temporal at %s...", TEMPORAL_HOST)
-        _client = await Client.connect(TEMPORAL_HOST)
+        logger.info("Connecting to Temporal at %s...", settings.TEMPORAL_HOST)
+        _client = await Client.connect(settings.TEMPORAL_HOST)
     return _client
 
 

@@ -92,8 +92,8 @@ async def get_current_user(request: Request) -> dict:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token telah dicabut. Silakan login kembali.")
     except HTTPException:
         raise
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Token version check failed: %s", e)
 
     if not user.get("is_active", False):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akun Anda telah dinonaktifkan. Hubungi admin.")

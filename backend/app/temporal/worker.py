@@ -6,11 +6,11 @@ Run with: python -m app.temporal.worker
 """
 import asyncio
 import logging
-import os
 
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from app.core.config import settings
 from app.temporal.workflows import IngestionWorkflow
 from app.temporal.activities import (
     detect_file_type_activity,
@@ -26,15 +26,14 @@ from app.temporal.activities import (
 
 logger = logging.getLogger(__name__)
 
-TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "localhost:7233")
 TASK_QUEUE = "enterprisemind-ingestion"
 
 
 async def main():
     """Start the Temporal worker."""
-    logger.info("Connecting to Temporal at %s...", TEMPORAL_HOST)
+    logger.info("Connecting to Temporal at %s...", settings.TEMPORAL_HOST)
 
-    client = await Client.connect(TEMPORAL_HOST)
+    client = await Client.connect(settings.TEMPORAL_HOST)
 
     worker = Worker(
         client,
