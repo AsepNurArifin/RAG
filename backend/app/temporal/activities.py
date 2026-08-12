@@ -36,14 +36,6 @@ async def download_from_minio_activity(object_name: str, filename: str) -> str:
     return local_dest
 
 
-@activity.defn(name="extract_graph")
-async def extract_graph_activity(text: str, filename: str, document_id: str) -> dict:
-    """Extract entities and relationships for Knowledge Graph from extracted text."""
-    from app.ingestion.pipeline import run_graph_extraction
-    result = await run_graph_extraction(text=text, filename=filename, document_id=document_id)
-    return result or {"entities": [], "relationships": []}
-
-
 @activity.defn(name="cleanup_temp_file")
 async def cleanup_temp_file_activity(local_path: str) -> bool:
     """Hapus file temporary lokal."""

@@ -6,6 +6,33 @@
 
 ---
 
+## 0.1 Neo4j Graph Removal (2026-08-12)
+
+Menghapus total Knowledge Graph (Neo4j) layer yang overengineering — extraction memakan biaya LLM per upload tapi `graph_context` tidak pernah dibaca agent mana pun (dead output).
+
+### Dihapus
+- `app/core/neo4j_client.py`, `app/ingestion/graph_extractor.py`, `app/retrieval/graph_traversal.py`, `app/api/graph.py`, `app/db/graph.py`
+- Service `neo4j` + volume `neo4j_data`/`neo4j_logs` di `docker-compose.yml`
+- Tabel `graph_drafts` dari `schema.sql` & `supabase_migration.sql`
+- Dependency `neo4j` dari `pyproject.toml`/`uv.lock`
+- `GRAPH_PLAN.md`
+
+### Dimodifikasi
+- `ingestion/pipeline.py`: hapus Step 4 (graph extraction) & `run_graph_extraction()`
+- `temporal/workflows.py` & `activities.py` & `worker.py`: hapus `extract_graph_activity` & step-nya
+- `agents/retriever.py`: hapus blok graph traversal & `graph_context` dari return
+- `graph/state.py`: hapus field `graph_context` (LangGraph utuh)
+- `api/query.py` & `scripts/run_evaluation.py`: hapus `graph_context` dari initial state
+- `app/core/config.py`: hapus settings `NEO4J_*`
+- PostgreSQL volume di-reset → schema fresh tanpa `graph_drafts`
+
+### Hasil
+- LangGraph (`app/graph/`) tidak disentuh — jantung multi-agent tetap utuh
+- Ingestion lebih cepat (tanpa LLM extraction call tambahan)
+- 1 service Docker berkurang (~768MB RAM hemat)
+
+---
+
 ## 0. Production Readiness Fix (2026-08-05)
 
 Perubahan untuk menghilangkan pemblokir produksi dan hardening keamanan.

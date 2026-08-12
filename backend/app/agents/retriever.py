@@ -164,27 +164,6 @@ def run_retriever_agent(state: GraphState) -> GraphState:
             logger.warning("[Retriever] Tidak ditemukan dokumen relevan untuk: '%s...'", query[:60])
             return {**state, "retrieved_documents": []}
 
-        # Step 3b: Graph traversal (kondisional — hanya untuk intent tertentu)
-        graph_context = None
-        if intent_type in ("analytical", "comparison", "comprehensive", "ambiguous"):
-            try:
-                from app.retrieval.graph_traversal import (
-                    extract_entities_from_query,
-                    find_entity_paths,
-                    format_paths_for_context,
-                )
-                query_entities = extract_entities_from_query(query)
-                if query_entities:
-                    paths = find_entity_paths(query_entities, max_depth=3)
-                    graph_context = format_paths_for_context(paths)
-                    if graph_context:
-                        logger.info(
-                            "[Retriever] Graph context ditambahkan: %d path untuk %s",
-                            len(paths), query_entities,
-                        )
-            except Exception as e:
-                logger.warning("[Retriever] Graph traversal gagal (fallback): %s", e)
-
         # Step 4: Rerank → ambil top RERANK_TOP_K
         reranked = rerank_chunks(query=query, chunks=candidates, top_k=RERANK_TOP_K)
 
@@ -239,5 +218,4 @@ def run_retriever_agent(state: GraphState) -> GraphState:
     return {
         **state,
         "retrieved_documents": results,
-        "graph_context": graph_context or "",
     }

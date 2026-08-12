@@ -1,4 +1,20 @@
 -- EnterpriseMind AI Database Schema
+-- Urutan CREATE TABLE mengikuti dependency (referenced table dibuat lebih dulu).
+
+-- users: application users
+CREATE TABLE users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    full_name TEXT,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'viewer' CHECK (role IN ('admin', 'analyst', 'viewer')),
+    is_active BOOLEAN DEFAULT true,
+    token_version INTEGER DEFAULT 1,
+    department TEXT,
+    clearance_level INTEGER DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- documents: uploaded document metadata
 CREATE TABLE documents (
@@ -39,21 +55,6 @@ CREATE TABLE messages (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- users: application users
-CREATE TABLE users (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    full_name TEXT,
-    password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'viewer' CHECK (role IN ('admin', 'analyst', 'viewer')),
-    is_active BOOLEAN DEFAULT true,
-    token_version INTEGER DEFAULT 1,
-    department TEXT,
-    clearance_level INTEGER DEFAULT 1,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- query_logs: interaction logs for dashboard metrics
 CREATE TABLE query_logs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -88,13 +89,3 @@ CREATE TABLE IF NOT EXISTS chunk_hashes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- graph_drafts: pending entity/relationship extractions untuk review sebelum commit ke Neo4j
-CREATE TABLE IF NOT EXISTS graph_drafts (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
-    filename TEXT NOT NULL,
-    draft_data JSONB NOT NULL,
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'committed')),
-    reviewed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);

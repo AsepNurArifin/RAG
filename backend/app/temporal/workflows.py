@@ -106,19 +106,7 @@ class IngestionWorkflow:
                 retry_policy=RetryPolicy(maximum_attempts=3, backoff_coefficient=5),
             )
 
-            # Step 7: Graph extraction (optional — skip if text is not string)
-            try:
-                if isinstance(text, str) and text.strip():
-                    await workflow.execute_activity(
-                        "extract_graph",
-                        args=[text[:4000], filename, document_id],
-                        start_to_close_timeout=timedelta(seconds=120),
-                        task_queue=TASK_QUEUE,
-                    )
-            except Exception as graph_err:
-                workflow.logger.warning("Graph extraction skipped: %s", graph_err)
-
-            # Step 8: Update status to indexed
+            # Step 7: Update status to indexed
             await workflow.execute_activity(
                 "update_document_status",
                 args=[document_id, "indexed", embed_result["child_count"]],

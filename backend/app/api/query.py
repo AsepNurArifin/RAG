@@ -94,7 +94,6 @@ async def process_query(
                 "citations": [],
                 "action_items": [],
                 "conversation_history": [],
-                "graph_context": "",
                 "error": None,
                 "query_deadline": time.time() + settings.QUERY_TIMEOUT_SECONDS,
             }

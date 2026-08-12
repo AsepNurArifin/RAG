@@ -44,13 +44,6 @@ class Settings:
     # Temporal
     TEMPORAL_HOST: str = field(default_factory=lambda: os.getenv("TEMPORAL_HOST", "localhost:7233"))
 
-    # Neo4j
-    NEO4J_ENABLED: bool = field(default_factory=lambda: os.getenv("NEO4J_ENABLED", "true").lower() == "true")
-    NEO4J_DRAFT_MODE: bool = field(default_factory=lambda: os.getenv("NEO4J_DRAFT_MODE", "true").lower() == "true")
-    NEO4J_URI: str = field(default_factory=lambda: os.getenv("NEO4J_URI", "bolt://localhost:7687"))
-    NEO4J_USER: str = field(default_factory=lambda: os.getenv("NEO4J_USER", "neo4j"))
-    NEO4J_PASSWORD: str = field(default_factory=lambda: os.getenv("NEO4J_PASSWORD", "enterprisemind"))
-
     # Embedding
     EMBEDDING_MODEL: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"))
     EMBEDDING_DIMENSIONS: int = 1024

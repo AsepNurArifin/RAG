@@ -97,19 +97,6 @@ CREATE TABLE IF NOT EXISTS chunk_hashes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tabel draft extraksi graph (menunggu review sebelum commit ke Neo4j)
-CREATE TABLE IF NOT EXISTS graph_drafts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
-    filename TEXT NOT NULL,
-    draft_data JSONB NOT NULL,
-    status TEXT DEFAULT 'pending' CHECK (
-        status IN ('pending', 'approved', 'rejected', 'committed')
-    ),
-    reviewed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ============================================
 -- Upgrade idempotent untuk database lama
 -- (jika tabel sudah dibuat dengan struktur versi sebelumnya)
@@ -146,7 +133,6 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id
 CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
 CREATE INDEX IF NOT EXISTS idx_chunk_hashes_document ON chunk_hashes(document_id);
-CREATE INDEX IF NOT EXISTS idx_graph_drafts_status ON graph_drafts(status);
 
 -- ============================================
 -- Row Level Security (aktifkan untuk production)
@@ -158,7 +144,6 @@ ALTER TABLE query_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evaluation_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chunk_hashes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE graph_drafts ENABLE ROW LEVEL SECURITY;
 
 -- Policy: service_role bisa full access (Bypass RLS for backend service)
 DROP POLICY IF EXISTS "Service role full access on users" ON users;
@@ -181,6 +166,3 @@ CREATE POLICY "Service role full access on evaluation_results" ON evaluation_res
 
 DROP POLICY IF EXISTS "Service role full access on chunk_hashes" ON chunk_hashes;
 CREATE POLICY "Service role full access on chunk_hashes" ON chunk_hashes TO service_role USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Service role full access on graph_drafts" ON graph_drafts;
-CREATE POLICY "Service role full access on graph_drafts" ON graph_drafts TO service_role USING (true) WITH CHECK (true);

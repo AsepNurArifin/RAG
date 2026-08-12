@@ -162,7 +162,6 @@ from app.api.metrics import router as metrics_router
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 from app.api.sessions import router as sessions_router
-from app.api.graph import router as graph_router
 
 app.include_router(auth_router)
 app.include_router(upload_router)
@@ -171,7 +170,6 @@ app.include_router(documents_router)
 app.include_router(metrics_router)
 app.include_router(users_router)
 app.include_router(sessions_router)
-app.include_router(graph_router)
 
 if __name__ == "__main__":
     import uvicorn

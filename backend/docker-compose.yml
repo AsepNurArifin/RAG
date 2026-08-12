@@ -1,6 +1,6 @@
 # EnterpriseMind AI — Docker Compose
-# Milvus (Vector DB) + Temporal (dengan PostgreSQL internal)
-# Backend + Application PostgreSQL run locally
+# Milvus (Vector DB) + Temporal + PostgreSQL (application DB) + Docling
+# Backend & Temporal Worker tetap run locally di host (uvicorn / python -m app.temporal.worker)
 #
 # Usage:
 #   docker compose up -d      # Start services
@@ -111,6 +111,28 @@ services:
     networks:
       - enterprisemind_net
 
+  postgres-app:
+    image: postgres:16-alpine
+    container_name: enterprisemind_postgres
+    environment:
+      - POSTGRES_DB=enterprisemind
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_app_data:/var/lib/postgresql/data
+      - ./app/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./docker/init/02-admin-user.sql:/docker-entrypoint-initdb.d/02-admin-user.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enterprisemind"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
+
   temporal-ui:
     image: temporalio/ui:2.28.0
     container_name: enterprisemind_temporal_ui
@@ -147,30 +169,6 @@ services:
     networks:
       - enterprisemind_net
 
-  neo4j:
-    image: neo4j:5-community
-    container_name: enterprisemind_neo4j
-    environment:
-      - NEO4J_AUTH=neo4j/enterprisemind
-      - NEO4J_server_memory_heap_max__size=512M
-      - NEO4J_server_memory_pagecache_size=256M
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    healthcheck:
-      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "enterprisemind", "RETURN 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - enterprisemind_net
-
 volumes:
   milvus_etcd:
     driver: local
@@ -178,13 +176,11 @@ volumes:
     driver: local
   milvus_data:
     driver: local
+  postgres_app_data:
+    driver: local
   temporal_data:
     driver: local
   docling_models:
-    driver: local
-  neo4j_data:
-    driver: local
-  neo4j_logs:
     driver: local
 
 networks:

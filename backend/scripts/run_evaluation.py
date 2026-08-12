@@ -52,12 +52,11 @@ async def agentic_graph_runner(question: str) -> dict:
         "confidence_score": 0.0,
         "needs_reflection": False,
         "reflection_count": 0,
-            "final_answer": "",
-            "citations": [],
-            "action_items": [],
-            "conversation_history": [],
-            "graph_context": "",
-            "error": None,
+        "final_answer": "",
+        "citations": [],
+        "action_items": [],
+        "conversation_history": [],
+        "error": None,
     }
 
     result = graph.invoke(initial_state)

@@ -1,20 +1,17 @@
 # EnterpriseMind AI
 
-**Intelligent Multi-Agent Knowledge Assistant** — Sistem Agentic RAG dengan arsitektur LangGraph multi-agent: Orchestrator, Researcher, Verifier, Summarizer, Executor. Dilengkapi fact verification, reflection loop, hybrid retrieval, **Knowledge Graph reasoning**, dan full observability.
+**Intelligent Multi-Agent Knowledge Assistant** — Sistem Agentic RAG dengan arsitektur LangGraph multi-agent: Orchestrator, Researcher, Verifier, Summarizer, Executor. Dilengkapi fact verification, reflection loop, hybrid retrieval, dan full observability.
 
 ## Fitur Utama
 
 | Fitur | Deskripsi |
 |---|---|
 | **Multi-Agent Orchestration** | 5 agent dikendalikan LangGraph state machine dengan conditional routing |
-| **Knowledge Graph (Neo4j)** | Entity extraction + relationship mapping untuk multi-hop reasoning & learning paths |
 | **Hybrid Retrieval** | Vector similarity (70%) + keyword matching (30%) via Milvus + Sastrawi stemming |
-| **Conditional Graph Traversal** | Graph reasoning hanya aktif untuk query analytical/comparison/comprehensive |
 | **Fact Verification** | Verifier Agent + Confidence Scoring + Reflection Loop (max 1 iterasi, optimized) |
 | **Citation & Source Tracing** | Setiap klaim disertai sitasi ke dokumen sumber yang dapat ditelusuri |
 | **Action Generation** | Executor Agent menghasilkan draft action items dari query |
 | **Enterprise UI** | Next.js 16 + React 19 + Tailwind v4 + Process Rail + Confidence Indicator |
-| **Draft-then-Review** | Entity extraction disimpan di PostgreSQL dulu, review sebelum commit ke Neo4j |
 | **Observability** | LangFuse tracing per-agent, latency monitoring, token cost tracking |
 | **RAGAS Evaluation** | Evaluasi otomatis: Faithfulness, Answer Relevance, Context Precision, Recall |
 | **Security-Aware** | Prompt injection mitigation, tool read-only scoping, rate limiting |
@@ -45,9 +42,8 @@
  │  │  │         LangGraph Multi-Agent Graph         │ │   │
  │  │  │  ┌──────────┐    ┌─────────┐               │ │   │
  │  │  │  │Orchestrtr│───►│Retriever│               │ │   │
- │  │  │  │(Intent)  │    │(Hybrid+ │               │ │   │
- │  │  │  └──────────┘    │ Graph)  │               │ │   │
- │  │  │                  └────┬────┘               │ │   │
+ │  │  │  │(Intent)  │    │(Hybrid) │               │ │   │
+ │  │  │  └──────────┘    └────┬────┘               │ │   │
  │  │  │                       ▼                     │ │   │
  │  │  │                  ┌─────────┐               │ │   │
  │  │  │                  │Verifier │               │ │   │
@@ -65,12 +61,12 @@
  │  │  └─────────────────────────────────────────────┘ │   │
  │  └──────────────────────────────────────────────────┘   │
  │                                                           │
- │  ┌───────────────┐  ┌────────────┐  ┌──────────────┐   │
- │  │ Milvus Vector │  │   Neo4j    │  │  PostgreSQL  │   │
- │  │ DB (embeddings│  │ (Knowledge │  │  (metadata + │   │
- │  │ + parent-child│  │   Graph)   │  │  graph_drafts│   │
- │  │   retrieval)  │  │            │  │   + users)   │   │
- │  └───────────────┘  └────────────┘  └──────────────┘   │
+ │  ┌───────────────┐                 ┌──────────────┐   │
+ │  │ Milvus Vector │                 │  PostgreSQL  │   │
+ │  │ DB (embeddings│                 │  (metadata + │   │
+ │  │ + parent-child│                 │   users)     │   │
+ │  │   retrieval)  │                 └──────────────┘   │
+ │  └───────────────┘
  │                                                           │
  │  ┌───────────────┐  ┌────────────┐  ┌──────────────┐   │
  │  │    Docling    │  │  Temporal  │  │    MinIO     │   │
@@ -85,39 +81,6 @@
               llama-3.3-70b-versatile)
 ```
 
-## Knowledge Graph Integration (Neo4j)
-
-### Entity Types (7 tipe selektif)
-- **Skill**: Kompetensi (Python, Leadership, Data Analysis)
-- **Training**: Modul pelatihan (TNA, DNA, LVC)
-- **SOP**: Prosedur standar (SOP Cuti, SOP WFH)
-- **Department**: Divisi (HR, Finance, Operations)
-- **Position**: Jabatan (HRBP, Manager, Analyst)
-- **Certificate**: Sertifikat (Certified Trainer, BNSP)
-- **Policy**: Kebijakan (WFH Policy, Leave Policy)
-
-### Relationship Types (5 tipe)
-- **PREREQUISITE_FOR**: A harus dikuasai sebelum B
-- **REQUIRES**: Training membutuhkan Skill
-- **PART_OF**: A adalah sub-bagian dari B
-- **GOVERNS**: Policy berlaku untuk Department/Position
-- **MENTIONED_IN**: Entity muncul di dokumen
-
-### Conditional Graph Traversal
-Graph traversal **hanya aktif** untuk intent:
-- `analytical` — "Apa hubungan TNA dan DNA?"
-- `comparison` — "Bandingkan Leadership dan Performance Review"
-- `comprehensive` — "Learning path menjadi HRBP"
-- `ambiguous` — Query tidak jelas
-
-Query `factual`, `greeting`, `action_request` → **skip graph** (0ms overhead).
-
-### Draft-then-Review Mechanism
-1. Entity extraction → simpan di PostgreSQL (`graph_drafts`)
-2. Review via API: `GET /api/graph/drafts`
-3. Approve → commit ke Neo4j: `PUT /api/graph/drafts/{id}/approve`
-4. Neo4j Browser: http://localhost:7474 (user: `neo4j`, password: `enterprisemind`)
-
 ### Alur Query Multi-Agent
 
 ```
@@ -129,14 +92,8 @@ Orchestrator ──→ Intent Classification (Tiered: Regex → Keyword → LLM)
     ▼
 Retriever ──→ Query Expansion (Dictionary-based atau LLM untuk comprehensive/ambiguous)
     │
-    ├──→ Hybrid Search (Milvus Vector 70% + Sastrawi Keyword 30%)
-    │     └─ Top-k adaptive berdasarkan intent (10-20 chunks)
-    │
-    ├──→ Graph Traversal (HANYA jika intent = analytical/comparison/comprehensive/ambiguous)
-    │     └─ Neo4j: Extract entities → multi-hop path (max depth 3)
-    │
-    └──→ Context Fusion (vector docs + graph paths)
-          │
+    └──→ Hybrid Search (Milvus Vector 70% + Sastrawi Keyword 30%)
+          │     └─ Top-k adaptive berdasarkan intent (10-20 chunks)
           ▼
     Reranker ──→ Cross-Encoder (BGE-reranker-v2-m3)
           │       └─ Top-10 chunks
@@ -149,14 +106,13 @@ Verifier ──→ Confidence Scoring + Fact Check (LLM 70B)
     │            └─ Score < 0.6 → Reflection (max 1x, reformulasi query)
     │                              └→ Retriever (ulang)
     ▼
-Summarizer ──→ Jawaban Akhir + Sitasi + Graph Context (LLM 70B)
+Summarizer ──→ Jawaban Akhir + Sitasi (LLM 70B)
     │              └─ Jika intent=action_request → Executor
     ▼
 Executor ──→ Action Items (draft email / to-do list, LLM 8B)
     │              └─ Requires Human Review ✓
     ▼
-Response ke User (final_answer, citations, graph_context, confidence_score, latency_ms, action_items)
-```
+Response ke User (final_answer, citations, confidence_score, latency_ms, action_items)
 ```
 
 ### Metrik Evaluasi (RAGAS)
@@ -174,12 +130,11 @@ Response ke User (final_answer, citations, graph_context, confidence_score, late
 
 | Aspek | Naive RAG | EnterpriseMind AI |
 |---|---|---|
-| Arsitektur | Single-pass retrieve→generate | Multi-agent state graph + Knowledge Graph |
+| Arsitektur | Single-pass retrieve→generate | Multi-agent state graph |
 | Verifikasi Fakta | Tidak ada | Verifier Agent + Confidence Score |
 | Self-Correction | Tidak ada | Reflection loop (max 1x, optimized) |
 | Action Generation | Tidak ada | Executor Agent |
-| Retrieval | Vector only | Hybrid (vector + keyword) + Graph traversal |
-| Multi-hop Reasoning | Tidak ada | Neo4j graph dengan prerequisite chains |
+| Retrieval | Vector only | Hybrid (vector + keyword) |
 | Observability | Tidak ada | LangFuse per-agent tracing |
 | Keamanan | Tidak ada | Prompt injection detection + tool scoping |
 
@@ -190,8 +145,7 @@ Response ke User (final_answer, citations, graph_context, confidence_score, late
 | **LLM Provider** | Groq Cloud API | `llama-3.1-8b-instant` + `llama-3.3-70b-versatile` |
 | **Orchestration** | LangGraph + LangChain | 0.2.61 + 0.3.13 |
 | **Vector DB** | Milvus (standalone, Docker) | 2.5.6 |
-| **Knowledge Graph** | Neo4j Community (Docker) | 5-community |
-| **Metadata DB** | PostgreSQL (local) | 16.x |
+| **Metadata DB** | PostgreSQL (Docker) | 16.x |
 | **Object Storage** | MinIO (Docker) | Latest |
 | **Workflow Engine** | Temporal (Docker) | Latest |
 | **Document Parser** | Docling + PyMuPDF4LLM + RapidOCR | Latest |
@@ -227,22 +181,10 @@ uv sync
 cp .env.example .env
 # Edit .env: tambahkan GROQ_API_KEY, DATABASE_URL, dll.
 
-# Start Docker services (Milvus, Neo4j, Temporal, MinIO, Docling)
+# Start Docker services (Milvus, PostgreSQL, Temporal, MinIO, Docling)
 docker compose up -d
 
-# Verify Neo4j
-docker compose exec neo4j cypher-shell -u neo4j -p enterprisemind "RETURN 1"
-
-# Run database migrations
-.venv\Scripts\python -c "
-import asyncio, asyncpg
-async def migrate():
-    conn = await asyncpg.connect('postgresql://postgres:Password@localhost:5432/enterprisemind')
-    with open('app/db/schema.sql', 'r') as f:
-        await conn.execute(f.read())
-    await conn.close()
-asyncio.run(migrate())
-"
+# Database schema ter-init otomatis via /docker-entrypoint-initdb.d (fresh volume)
 
 # Start Temporal Worker (background)
 .venv\Scripts\python -m app.temporal.worker
@@ -271,23 +213,8 @@ npm run dev
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
-- **Neo4j Browser**: http://localhost:7474 (neo4j / enterprisemind)
 - **Temporal UI**: http://localhost:8233
 - **MinIO Console**: http://localhost:9001 (minioadmin / minioadmin)
-
-### Neo4j Knowledge Graph
-
-#### Review & Approve Drafts
-```bash
-# List pending drafts
-curl http://localhost:8000/api/graph/drafts
-
-# Approve draft
-curl -X PUT http://localhost:8000/api/graph/drafts/{draft_id}/approve
-
-# View graph via Neo4j Browser (http://localhost:7474)
-MATCH (e:Entity)-[r]->(t) RETURN e, r, t LIMIT 50
-```
 
 ### Evaluasi RAGAS
 ```bash
@@ -323,19 +250,9 @@ Sistem telah dioptimasi untuk performa maksimal di laptop 8GB RAM:
 | **Sastrawi LRU Cache** | Query -50% untuk dokumen yang sering di-retrieve | `hybrid_search.py:63` |
 | **Exponential Backoff Turun** | Rate limit recovery 2× lebih cepat (2s→1s base) | `llm_provider.py:101` |
 | **Reflection Loop 2→1** | Worst case query -30 detik | `config.py:50` |
-| **Conditional Graph Traversal** | Graph skip untuk 60% query (factual/greeting/action) | `retriever.py:168` |
 | **Batch Embedding** | BGE-M3 default batch_size=32 (bukan 1-by-1) | `embedder.py` |
 
 Detail lengkap: **[OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md)**
-
-## Knowledge Graph Details
-
-Lihat **[GRAPH_PLAN.md](GRAPH_PLAN.md)** untuk:
-- Arsitektur lengkap Neo4j integration
-- Entity & Relationship model (7 entity types, 5 relationship types)
-- Draft-then-Review mechanism
-- Conditional traversal logic
-- Resource impact & trade-offs
 
 ## Struktur Repositori
 
@@ -344,20 +261,20 @@ EnterpriseMind_AI/
 ├── backend/
 │   ├── app/
 │   │   ├── agents/        # Orchestrator, Retriever, Verifier, Summarizer, Executor
-│   │   ├── api/           # FastAPI routes (/query, /upload, /graph, /documents, /metrics)
-│   │   ├── core/          # config.py, llm_provider.py, neo4j_client.py, postgres_client.py
-│   │   ├── db/            # CRUD functions (documents, messages, queries, graph drafts)
+│   │   ├── api/           # FastAPI routes (/query, /upload, /documents, /metrics)
+│   │   ├── core/          # config.py, llm_provider.py, postgres_client.py
+│   │   ├── db/            # CRUD functions (documents, messages, queries)
 │   │   ├── evaluation/    # RAGAS runner + test set (50+ Q&A)
 │   │   ├── graph/         # LangGraph state + build_graph
-│   │   ├── ingestion/     # extractor, chunker, embedder, graph_extractor, pipeline
-│   │   ├── retrieval/     # hybrid_search, reranker, parent_resolver, graph_traversal
+│   │   ├── ingestion/     # extractor, chunker, embedder, pipeline
+│   │   ├── retrieval/     # hybrid_search, reranker, parent_resolver
 │   │   ├── temporal/      # Temporal workflows + activities + worker
 │   │   ├── memory/        # conversation_memory
 │   │   └── tools/         # web_search, calculator, metadata_query
 │   ├── scripts/           # run_evaluation, build_naive_rag, load_test
 │   ├── tests/             # Unit tests
 │   ├── Dockerfile
-│   └── docker-compose.yml # 8 services: Milvus, Neo4j, Temporal, MinIO, Docling, etcd, PostgreSQL
+│   └── docker-compose.yml # 7 services: Milvus, Temporal, MinIO, Docling, etcd, PostgreSQL, Temporal-DB
 ├── frontend/
 │   ├── app/               # (chat), admin, admin/metrics
 │   ├── components/        # ChatWindow, MessageBubble, CitationCard, ProcessRail, DocumentUploader
@@ -366,7 +283,6 @@ EnterpriseMind_AI/
 │   └── lib/               # api.ts, utils.ts
 ├── docs/                  # 13 dokumen HR training (PDF/PPTX)
 ├── ARCHITECTURE.md        # Arsitektur detail + constraints
-├── GRAPH_PLAN.md          # **BARU**: Neo4j Knowledge Graph implementation plan
 ├── OPTIMIZATION_PLAN.md   # **BARU**: Performance optimizations detail
 ├── AI_RULES.md            # Aturan untuk AI coding agent
 ├── CODING_STANDARDS.md    # Konvensi kode
@@ -384,7 +300,6 @@ EnterpriseMind_AI/
 | File | Deskripsi |
 |---|---|
 | **[ARCHITECTURE.md](ARCHITECTURE.md)** | Arsitektur sistem, constraints, trade-offs |
-| **[GRAPH_PLAN.md](GRAPH_PLAN.md)** | Neo4j integration: entity model, draft-review, conditional traversal |
 | **[OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md)** | 4 optimasi performa dengan analisis mendalam |
 | **[CODING_STANDARDS.md](CODING_STANDARDS.md)** | Konvensi kode Python & TypeScript |
 | **[DECISION_LOG.md](DECISION_LOG.md)** | Architecture Decision Records (ADR) |
