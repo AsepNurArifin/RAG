@@ -12,7 +12,6 @@ Usage:
     # Run worker
     python -m app.temporal.worker
 """
-from app.temporal.client import start_ingestion_workflow
 from app.temporal.workflows import IngestionWorkflow
 
-__all__ = ["start_ingestion_workflow", "IngestionWorkflow"]
+__all__ = ["IngestionWorkflow"]

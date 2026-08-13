@@ -216,3 +216,49 @@ class TestChunker:
                 for word in end_of_first.split()
                 if word.strip()
             )
+
+
+# ------------------------------------------------------------------ #
+# Embedder Tests
+# ------------------------------------------------------------------ #
+
+
+class TestEmbedder:
+    """Test suite untuk document embedder."""
+
+    @patch("pymilvus.Collection")
+    @patch("pymilvus.utility.has_collection", return_value=True)
+    @patch("pymilvus.connections.has_connection", return_value=True)
+    def test_insert_parents_directly_populates_all_fields(
+        self, mock_has_conn, mock_has_col, mock_collection_cls
+    ):
+        """_insert_parents_directly harus menyesuaikan seluruh field di schema Milvus."""
+        from app.ingestion.embedder import _insert_parents_directly
+        from pymilvus import DataType
+
+        field_pk = MagicMock(name="pk", is_primary=True, dtype=DataType.VARCHAR)
+        field_pk.name = "pk"
+        field_vec = MagicMock(name="vector", is_primary=False, dtype=DataType.FLOAT_VECTOR)
+        field_vec.name = "vector"
+        field_text = MagicMock(name="text", is_primary=False, dtype=DataType.VARCHAR)
+        field_text.name = "text"
+        field_cat = MagicMock(name="category", is_primary=False, dtype=DataType.VARCHAR)
+        field_cat.name = "category"
+
+        mock_col = MagicMock()
+        mock_col.schema.fields = [field_pk, field_vec, field_text, field_cat]
+        mock_collection_cls.return_value = mock_col
+
+        texts = ["Parent text 1"]
+        metadatas = [{"filename": "doc.pdf", "category": "finance", "chunk_type": "parent"}]
+        ids = ["doc.pdf__parent_0"]
+
+        count = _insert_parents_directly(texts, metadatas, ids)
+
+        assert count == 1
+        mock_col.insert.assert_called_once()
+        inserted_entities = mock_col.insert.call_args[0][0]
+        assert inserted_entities[0]["pk"] == "doc.pdf__parent_0"
+        assert inserted_entities[0]["text"] == "Parent text 1"
+        assert inserted_entities[0]["category"] == "finance"
+

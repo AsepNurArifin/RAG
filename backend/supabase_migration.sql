@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     full_name TEXT,
     password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'viewer' CHECK (role IN ('admin', 'analyst', 'viewer')),
+    role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user', 'analyst', 'viewer')),
     is_active BOOLEAN DEFAULT true,
     token_version INTEGER DEFAULT 1,
     department TEXT,
@@ -107,9 +107,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS clearance_level INTEGER DEFAULT 1;
 
--- Perbaiki constraint role lama ('user','admin') menjadi ('admin','analyst','viewer')
+-- Perbaiki constraint role lama menjadi ('admin', 'user', 'analyst', 'viewer')
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'analyst', 'viewer'));
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'user', 'analyst', 'viewer'));
 
 -- conversations: tambah session_id jika DB lama
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS session_id TEXT;

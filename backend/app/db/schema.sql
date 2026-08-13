@@ -7,7 +7,7 @@ CREATE TABLE users (
     email TEXT UNIQUE NOT NULL,
     full_name TEXT,
     password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'viewer' CHECK (role IN ('admin', 'analyst', 'viewer')),
+    role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user', 'analyst', 'viewer')),
     is_active BOOLEAN DEFAULT true,
     token_version INTEGER DEFAULT 1,
     department TEXT,

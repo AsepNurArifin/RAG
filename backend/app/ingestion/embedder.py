@@ -94,7 +94,7 @@ def _insert_parents_directly(texts: list[str], metadatas: list[dict], ids: list[
     Juga menghindari inisialisasi AsyncMilvusClient yang gagal di thread worker.
     Ref: OPTIMIZATION_PLAN.md P1
     """
-    from pymilvus import connections, Collection, utility
+    from pymilvus import connections, Collection, utility, DataType
 
     dim = settings.EMBEDDING_DIMENSIONS
     dummy_vector = [0.0] * dim
@@ -108,19 +108,35 @@ def _insert_parents_directly(texts: list[str], metadatas: list[dict], ids: list[
 
     col = Collection(settings.MILVUS_COLLECTION)
 
+    # Dapatkan semua field dalam schema koleksi Milvus
+    fields = col.schema.fields
+
     entities = []
     for text, meta, eid in zip(texts, metadatas, ids):
-        entities.append({
-            "text": text,
-            "vector": dummy_vector,
-            "pk": eid,
-            "chunk_type": meta.get("chunk_type", "parent"),
-            "filename": meta.get("filename", ""),
-            "page_number": meta.get("page_number", 0),
-            "document_id": meta.get("document_id", ""),
-            "parent_id": meta.get("parent_id", ""),
-            "chunk_index": meta.get("chunk_index", 0),
-        })
+        entity = {}
+        for field in fields:
+            fname = field.name
+            if field.is_primary or fname in ("pk", "id"):
+                entity[fname] = eid
+            elif fname in ("vector", "embedding"):
+                entity[fname] = dummy_vector
+            elif fname == "text":
+                entity[fname] = text
+            else:
+                # Metadata fields
+                if fname in meta and meta[fname] is not None:
+                    entity[fname] = meta[fname]
+                else:
+                    # Provide default based on field type if missing in meta
+                    if field.dtype in (DataType.INT64, DataType.INT32, DataType.INT16, DataType.INT8):
+                        entity[fname] = 0
+                    elif field.dtype in (DataType.FLOAT, DataType.DOUBLE):
+                        entity[fname] = 0.0
+                    elif field.dtype == DataType.BOOL:
+                        entity[fname] = False
+                    else:
+                        entity[fname] = ""
+        entities.append(entity)
 
     try:
         col.insert(entities)
