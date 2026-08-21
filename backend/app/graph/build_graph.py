@@ -35,6 +35,7 @@ from app.agents.summarizer import run_summarizer_agent
 from app.agents.verifier import run_verifier_agent
 from app.core.config import settings
 from app.graph.state import GraphState
+from app.tools.tool_router import run_tool_node
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ def build_agent_graph() -> StateGraph:
     # Register Nodes (agent functions)
     # ------------------------------------------------------------------ #
     graph.add_node("orchestrator", _timed_node(run_orchestrator_agent, "Orchestrator"))
+    graph.add_node("tools", _timed_node(run_tool_node, "Tools"))
     graph.add_node("researcher", _timed_node(run_retriever_agent, "Researcher"))
     graph.add_node("verifier", _timed_node(run_verifier_agent, "Verifier"))
     graph.add_node("summarizer", _timed_node(run_summarizer_agent, "Summarizer"))
@@ -75,10 +77,14 @@ def build_agent_graph() -> StateGraph:
         "orchestrator",
         _route_after_orchestrator,
         {
-            "researcher": "researcher",
+            "tools": "tools",
             "summarizer": "summarizer",  # untuk out_of_scope
         },
     )
+
+    # Tools → selalu lanjut ke Researcher (jika bukan out_of_scope).
+    # Tool results tersedia di state["tool_results"] untuk agent berikutnya.
+    graph.add_edge("tools", "researcher")
 
     # Researcher → selalu ke Verifier
     graph.add_edge("researcher", "verifier")
@@ -176,7 +182,7 @@ def _timed_node(func, name: str):
 
 def _route_after_orchestrator(state: GraphState) -> str:
     """
-    Routing setelah Orchestrator: ke Researcher atau langsung Summarizer.
+    Routing setelah Orchestrator: ke Tools lalu Researcher, atau langsung Summarizer.
 
     Ref: FR2.2 — Orchestrator menentukan agent yang diaktifkan.
     """
@@ -186,8 +192,8 @@ def _route_after_orchestrator(state: GraphState) -> str:
         logger.info("[Router] Intent=out_of_scope → langsung ke Summarizer")
         return "summarizer"
 
-    logger.info("[Router] Intent=%s → ke Researcher", intent)
-    return "researcher"
+    logger.info("[Router] Intent=%s → ke Tools (tool router)", intent)
+    return "tools"
 
 
 def _route_after_verifier(state: GraphState) -> str:

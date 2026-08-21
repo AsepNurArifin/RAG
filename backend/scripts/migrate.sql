@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     full_name VARCHAR(255),
     password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) DEFAULT 'viewer',
+    role VARCHAR(50) DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     is_active BOOLEAN DEFAULT true,
     token_version INTEGER DEFAULT 1,
     department VARCHAR(100),
@@ -98,15 +98,7 @@ CREATE TABLE IF NOT EXISTS chunk_hashes (
 
 CREATE INDEX IF NOT EXISTS idx_chunk_hashes_hash ON chunk_hashes(hash);
 
--- Insert default admin user (password: admin123)
--- bcrypt hash of 'admin123'
-INSERT INTO users (email, full_name, password_hash, role, is_active, department, clearance_level)
-VALUES (
-    'admin@enterprisemind.com',
-    'System Admin',
-    '$2b$12$jPujZjCoz5UnqCWgquxRIe1.X7YnaHhrUTp8Y9LJFSV0kTtWnzL/i',
-    'admin',
-    true,
-    'IT',
-    5
-) ON CONFLICT (email) DO NOTHING;
+-- Admin awal TIDAK lagi di-seed dengan password publik.
+-- Buat admin pertama lewat environment (lihat README):
+--   BOOTSTRAP_ADMIN_EMAIL=admin@company.com
+--   BOOTSTRAP_ADMIN_PASSWORD=<password-kuat-minimal-12-karakter>

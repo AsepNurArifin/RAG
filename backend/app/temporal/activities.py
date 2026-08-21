@@ -24,14 +24,18 @@ async def detect_file_type_activity(file_path: str, filename: str) -> str:
 
 @activity.defn(name="download_from_minio")
 async def download_from_minio_activity(object_name: str, filename: str) -> str:
-    """Download file from MinIO to a temporary local path."""
+    """Download file dari MinIO ke temporary local path (nama server-generated)."""
     import tempfile
     import asyncio
+    from pathlib import Path
     from app.core.minio_client import minio_client
-    
+
     temp_dir = tempfile.gettempdir()
-    local_dest = os.path.join(temp_dir, f"minio_temp_{object_name}_{filename}")
-    
+    # Gunakan basename object_name (sudah server-generated UUID) sebagai
+    # nama temp; jangan pernah memakai raw filename client di path.
+    safe_suffix = Path(object_name or "doc.bin").name.replace("..", "_")[:80]
+    local_dest = str(Path(temp_dir) / f"emind_dl_{safe_suffix}")
+
     await asyncio.to_thread(minio_client.download_file, object_name, local_dest)
     return local_dest
 
@@ -40,14 +44,14 @@ async def download_from_minio_activity(object_name: str, filename: str) -> str:
 async def cleanup_temp_file_activity(local_path: str) -> bool:
     """Hapus file temporary lokal."""
     import asyncio
-    import os
+    import os as _os
     
     def _delete():
         import time
-        if os.path.exists(local_path):
+        if _os.path.exists(local_path):
             for attempt in range(3):
                 try:
-                    os.remove(local_path)
+                    _os.remove(local_path)
                     logger.info("Berhasil menghapus temp file: %s", local_path)
                     return True
                 except PermissionError as e:
@@ -106,7 +110,7 @@ async def chunk_document_activity(text_or_pages: list[dict] | str, metadata: dic
 
 @activity.defn(name="embed_and_store")
 async def embed_and_store_activity(parent_chunks: list[dict], child_chunks: list[dict]) -> dict:
-    """Embed chunks and store to Chroma/Milvus. Returns counts."""
+    """Embed chunks dan simpan ke Milvus. Returns counts."""
     import asyncio
     from app.core.postgres_client import get_pool, fetch_all
     from app.ingestion.chunker import DocumentChunk

@@ -62,7 +62,7 @@ def get_vector_store() -> Milvus:
 
 
 def embed_and_store(chunks: list[DocumentChunk]) -> int:
-    """Embed chunks and store to Chroma. Returns count of stored chunks."""
+    """Embed chunks dan simpan ke Milvus. Returns count of stored chunks."""
     if not chunks:
         logger.warning("Tidak ada chunk untuk di-embed.")
         return 0
@@ -153,7 +153,7 @@ def embed_and_store_parent_child(
     child_chunks: list[DocumentChunk],
 ) -> tuple[int, int]:
     """
-    Store parent-child chunks ke Chroma.
+    Store parent-child chunks ke Milvus.
 
     Strategy (Development):
     - Child chunks: di-embed dan disimpan normal (untuk retrieval)
@@ -198,13 +198,38 @@ def embed_and_store_parent_child(
     return (len(parent_chunks), len(child_chunks))
 
 
-def delete_document_chunks(filename: str) -> None:
-    """Delete all chunks for a given filename from Milvus."""
+def delete_document_chunks(
+    document_id: str | None = None,
+    legacy_filename: str | None = None,
+) -> None:
+    """
+    Delete all chunks milik dokumen dari Milvus.
+
+    Args:
+        document_id: Canonical document ID (identifier utama).
+        legacy_filename: Nama file lama untuk kompatibilitas dengan vector
+                         yang dibuat sebelum metadata document_id tersedia.
+
+    Expression dibangun dari document_id bila tersedia. Filename hanya
+    dipakai sebagai fallback untuk legacy vector (dari database, bukan client).
+    """
+    if not document_id and not legacy_filename:
+        logger.warning("delete_document_chunks dipanggil tanpa document_id/filename.")
+        return
+
     store = get_vector_store()
     try:
         store.col.load()
-        expr = f'filename == "{filename}"'
+        if document_id:
+            escaped = str(document_id).replace('"', '\\"')
+            expr = f'document_id == "{escaped}"'
+            if legacy_filename:
+                legacy_escaped = str(legacy_filename).replace('"', '\\"')
+                expr = f'document_id == "{escaped}" or filename == "{legacy_escaped}"'
+        else:
+            legacy_escaped = str(legacy_filename).replace('"', '\\"')
+            expr = f'filename == "{legacy_escaped}"'
         store.col.delete(expr=expr)
-        logger.info("Dihapus chunks untuk file '%s' dari Milvus.", filename)
+        logger.info("Dihapus chunks dari Milvus: expr=%s", expr)
     except Exception as e:
-        logger.exception("Gagal menghapus chunks dari Milvus untuk %s", filename)
+        logger.exception("Gagal menghapus chunks dari Milvus untuk document_id=%s filename=%s", document_id, legacy_filename)

@@ -12,7 +12,7 @@
 | **Citation & Source Tracing** | Setiap klaim disertai sitasi ke dokumen sumber yang dapat ditelusuri |
 | **Action Generation** | Executor Agent menghasilkan draft action items dari query |
 | **Enterprise UI** | Next.js 16 + React 19 + Tailwind v4 + Process Rail + Confidence Indicator |
-| **Observability** | LangFuse tracing per-agent, latency monitoring, token cost tracking |
+| **Observability** | LangFuse tracing per-agent (optional; enabled bila `LANGFUSE_ENABLED=true`), token usage & cost tracking di `query_logs` |
 | **RAGAS Evaluation** | Evaluasi otomatis: Faithfulness, Answer Relevance, Context Precision, Recall |
 | **Security-Aware** | Prompt injection mitigation, tool read-only scoping, rate limiting |
 | **Performance Optimized** | Parent embedding skip, Sastrawi LRU cache, exponential backoff optimized |
@@ -77,8 +77,8 @@
                         │
                         ▼
                    Groq API
-              (llama-3.1-8b-instant
-              llama-3.3-70b-versatile)
+              (openai/gpt-oss-20b
+              openai/gpt-oss-120b)
 ```
 
 ### Alur Query Multi-Agent
@@ -142,7 +142,7 @@ Response ke User (final_answer, citations, confidence_score, latency_ms, action_
 
 | Layer | Teknologi | Versi |
 |---|---|---|
-| **LLM Provider** | Groq Cloud API | `llama-3.1-8b-instant` + `llama-3.3-70b-versatile` |
+| **LLM Provider** | Groq Cloud API | `openai/gpt-oss-20b` + `openai/gpt-oss-120b` |
 | **Orchestration** | LangGraph + LangChain | 0.2.61 + 0.3.13 |
 | **Vector DB** | Milvus (standalone, Docker) | 2.5.6 |
 | **Metadata DB** | PostgreSQL (Docker) | 16.x |
@@ -179,10 +179,19 @@ uv sync
 
 # Setup environment
 cp .env.example .env
-# Edit .env: tambahkan GROQ_API_KEY, DATABASE_URL, dll.
+# Edit .env: tambahkan GROQ_API_KEY, DATABASE_URL, JWT_SECRET_KEY (wajib di
+# semua environment), dll. JANGAN commit .env.
+
+# Admin awal (fresh deployment) — buat lewat environment, BUKAN seed default:
+# BOOTSTRAP_ADMIN_EMAIL=admin@company.com
+# BOOTSTRAP_ADMIN_PASSWORD=<password-kuat-minimal-12-karakter>
+# Admin dibuat otomatis saat backend pertama kali start.
 
 # Start Docker services (Milvus, PostgreSQL, Temporal, MinIO, Docling)
 docker compose up -d
+
+# Jalankan migrasi database untuk deployment existing:
+psql -U postgres -d enterprisemind -f app/db/migrations/001_security_storage_consistency.sql
 
 # Database schema ter-init otomatis via /docker-entrypoint-initdb.d (fresh volume)
 
@@ -213,7 +222,7 @@ npm run dev
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
-- **Temporal UI**: http://localhost:8233
+- **Temporal UI**: http://localhost:8081
 - **MinIO Console**: http://localhost:9001 (minioadmin / minioadmin)
 
 ### Evaluasi RAGAS
@@ -270,11 +279,12 @@ EnterpriseMind_AI/
 │   │   ├── retrieval/     # hybrid_search, reranker, parent_resolver
 │   │   ├── temporal/      # Temporal workflows + activities + worker
 │   │   ├── memory/        # conversation_memory
-│   │   └── tools/         # web_search, calculator, metadata_query
+│   │   └── tools/         # calculator, metadata_query (web search DILARANG)
 │   ├── scripts/           # run_evaluation, build_naive_rag, load_test
 │   ├── tests/             # Unit tests
 │   ├── Dockerfile
-│   └── docker-compose.yml # 7 services: Milvus, Temporal, MinIO, Docling, etcd, PostgreSQL, Temporal-DB
+│   ├── docker-compose.yml     # Infra: Milvus, Temporal, PostgreSQL, MinIO, Docling (8 service)
+│   └── docker-compose.prod.yml# Prod: + service backend (FastAPI) & worker (Temporal)
 ├── frontend/
 │   ├── app/               # (chat), admin, admin/metrics
 │   ├── components/        # ChatWindow, MessageBubble, CitationCard, ProcessRail, DocumentUploader

@@ -144,7 +144,7 @@ def classify_intent_with_llm(query: str) -> tuple[str, float]:
     Returns:
         (intent, confidence)
     """
-    from app.core.llm_provider import get_llm
+    from app.core.llm_provider import get_llm, invoke_llm_instrumented
 
     llm = get_llm("fast", temperature=0.1)
 
@@ -162,7 +162,9 @@ Query: {query}
 Respond HANYA dengan JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}"""
 
     try:
-        response = llm.invoke(prompt)
+        response, _ = invoke_llm_instrumented(
+            chain=llm, input_data=prompt, agent_name="intent_classifier", task_type="fast", max_retries=2,
+        )
         import json
 
         text = response.content.strip()

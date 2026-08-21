@@ -14,7 +14,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.agents import VERIFIER_PROMPT
 from app.agents.utils import format_documents_for_prompt
 from app.core.config import settings
-from app.core.llm_provider import get_llm, invoke_with_retry
+from app.core.llm_provider import get_llm, invoke_llm_instrumented
 from app.graph.state import GraphState
 
 logger = logging.getLogger(__name__)
@@ -54,13 +54,22 @@ def run_verifier_agent(state: GraphState) -> GraphState:
         )
 
         # Verifier harus ketat, temperature rendah
-        llm = get_llm("reasoning", max_tokens=2048, request_timeout=60)
+        llm = get_llm("reasoning", max_tokens=4096, request_timeout=60)
         chain = prompt | llm
         logger.info("[Verifier] Memanggil LLM untuk verifikasi...")
-        response = invoke_with_retry(chain, {
-            "query": query,
-            "documents": format_documents_for_prompt(documents),
-        })
+        usage_meta = dict(state.get("llm_usage", {}) or {})
+        response, usage_meta = invoke_llm_instrumented(
+            chain,
+            {
+                "query": query,
+                "documents": format_documents_for_prompt(documents),
+            },
+            agent_name="verifier",
+            task_type="reasoning",
+            max_retries=2,
+            usage_meta=usage_meta,
+        )
+        state = {**state, "llm_usage": usage_meta}
         logger.info("[Verifier] LLM call selesai, parsing response...")
 
         try:

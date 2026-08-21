@@ -38,14 +38,27 @@ class IngestionWorkflow:
 
         workflow.logger.info("Starting ingestion: %s", filename)
 
-        # Step 0: Download from MinIO to temp file
-        local_file_path = await workflow.execute_activity(
-            "download_from_minio",
-            args=[file_path, filename],
-            start_to_close_timeout=timedelta(seconds=120),
-            task_queue=TASK_QUEUE,
-            retry_policy=RetryPolicy(maximum_attempts=3, backoff_coefficient=2),
-        )
+        # Step 0: Download dari MinIO ke temp file. Jika gagal, tidak ada
+        # temp file yang perlu dibersihkan (download belum menghasilkan file).
+        local_file_path = None
+        try:
+            local_file_path = await workflow.execute_activity(
+                "download_from_minio",
+                args=[file_path, filename],
+                start_to_close_timeout=timedelta(seconds=120),
+                task_queue=TASK_QUEUE,
+                retry_policy=RetryPolicy(maximum_attempts=3, backoff_coefficient=2),
+            )
+        except Exception as e:
+            workflow.logger.error("Download dari MinIO gagal: %s — %s", filename, str(e))
+            return {
+                "document_id": None,
+                "filename": filename,
+                "status": "failed",
+                "chunk_count": 0,
+                "processing_time_ms": int((workflow.now() - start_time).total_seconds() * 1000),
+                "error": f"Download dari MinIO gagal: {str(e)}",
+            }
 
         # Step 1: Detect file type if not provided
         if not file_type:
@@ -152,12 +165,13 @@ class IngestionWorkflow:
         
         finally:
             # Cleanup temp file regardless of success or failure
-            try:
-                await workflow.execute_activity(
-                    "cleanup_temp_file",
-                    args=[local_file_path],
-                    start_to_close_timeout=timedelta(seconds=30),
-                    task_queue=TASK_QUEUE,
-                )
-            except Exception as e:
-                workflow.logger.error("Gagal menghapus temp file: %s", str(e))
+            if local_file_path:
+                try:
+                    await workflow.execute_activity(
+                        "cleanup_temp_file",
+                        args=[local_file_path],
+                        start_to_close_timeout=timedelta(seconds=30),
+                        task_queue=TASK_QUEUE,
+                    )
+                except Exception as e:
+                    workflow.logger.error("Gagal menghapus temp file: %s", str(e))

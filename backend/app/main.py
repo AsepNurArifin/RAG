@@ -75,13 +75,35 @@ app.add_middleware(
 # ------------------------------------------------------------------ #
 @app.get("/health")
 async def health_check():
-    """Health check endpoint untuk monitoring."""
+    """Health check endpoint untuk monitoring (backward compatibility)."""
     return {
         "status": "healthy",
         "app": "EnterpriseMind AI",
         "version": "0.1.0",
         "environment": settings.APP_ENV,
     }
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness: membuktikan proses hidup, tanpa dependency check."""
+    return {"status": "alive", "app": "EnterpriseMind AI"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """
+    Readiness: memeriksa dependency critical.
+
+    200 jika dependency critical siap; 503 jika tidak.
+    Status 'degraded' jika hanya dependency optional yang turun.
+    """
+    from fastapi.responses import JSONResponse
+    from app.core.health import readiness
+
+    result = await readiness()
+    status_code = 200 if result["status"] in ("ready", "degraded") else 503
+    return JSONResponse(status_code=status_code, content=result)
 
 
 # ------------------------------------------------------------------ #
@@ -127,6 +149,14 @@ async def startup_event():
     except Exception as e:
         logger.warning("Failed to pre-load Sastrawi stemmer: %s", e)
 
+    # Bootstrap admin awal dari environment (jika diset) — tidak membuat
+    # credential default yang diketahui publik.
+    try:
+        from app.api.auth import bootstrap_admin_if_needed
+        await bootstrap_admin_if_needed()
+    except Exception as e:
+        logger.warning("Bootstrap admin gagal: %s", e)
+
     elapsed = time.time() - t0
     logger.info("Startup pre-loading completed in %.1fs", elapsed)
     logger.info("=" * 60)
@@ -162,6 +192,7 @@ from app.api.metrics import router as metrics_router
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 from app.api.sessions import router as sessions_router
+from app.api.workflows import router as workflows_router
 
 app.include_router(auth_router)
 app.include_router(upload_router)
@@ -170,6 +201,7 @@ app.include_router(documents_router)
 app.include_router(metrics_router)
 app.include_router(users_router)
 app.include_router(sessions_router)
+app.include_router(workflows_router)
 
 if __name__ == "__main__":
     import uvicorn

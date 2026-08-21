@@ -14,14 +14,16 @@ async def create_document(
     category: str = "uncategorized",
     storage_object_name: str | None = None,
     file_size_bytes: int = 0,
+    uploaded_by: str | None = None,
+    status: str = "pending",
 ) -> dict[str, Any]:
     """Create new document record."""
     query = """
-        INSERT INTO documents (filename, file_type, category, status, storage_object_name, file_size_bytes)
-        VALUES ($1, $2, $3, 'pending', $4, $5)
+        INSERT INTO documents (filename, file_type, category, status, storage_object_name, file_size_bytes, uploaded_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id, filename, file_type, category, status, storage_object_name, created_at
     """
-    result = await fetch_one(query, filename, file_type, category, storage_object_name, file_size_bytes)
+    result = await fetch_one(query, filename, file_type, category, status, storage_object_name, file_size_bytes, uploaded_by)
     logger.info("Dokumen dibuat: filename=%s, id=%s", filename, result["id"])
     return result
 
@@ -31,7 +33,7 @@ async def update_document_status(
     status: str,
     chunk_count: int | None = None,
 ) -> dict[str, Any]:
-    """Update document status (pending → processing → indexed / failed)."""
+    """Update document status (pending → processing → indexed / failed / deleting / delete_failed)."""
     if chunk_count is not None:
         query = """
             UPDATE documents
@@ -63,6 +65,16 @@ async def get_all_documents() -> list[dict[str, Any]]:
         LIMIT 100
     """
     return await fetch_all(query)
+
+
+async def get_document(document_id: str) -> dict[str, Any] | None:
+    """Get single document by ID."""
+    return await fetch_one(
+        "SELECT id, filename, file_type, category, status, chunk_count, "
+        "file_size_bytes, storage_object_name, uploaded_by, created_at, updated_at "
+        "FROM documents WHERE id = $1",
+        document_id,
+    )
 
 
 async def delete_document(document_id: str) -> bool:

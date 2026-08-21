@@ -111,6 +111,6 @@ def get_user_rbac_filter(user: dict) -> dict:
     """
     KMS Mode: Demokratisasi Informasi.
     Semua dokumen bisa diakses oleh semua karyawan.
-    Mengembalikan filter kosong agar ChromaDB mencari di seluruh dokumen.
+    Mengembalikan filter kosong agar retrieval mencari di seluruh dokumen.
     """
     return {}

@@ -10,8 +10,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.agents import SUMMARIZER_PROMPT
 from app.agents.utils import format_conversation_history, format_documents_for_prompt
-from app.core.config import settings
-from app.core.llm_provider import get_llm, invoke_with_retry
+from app.core.llm_provider import get_llm, invoke_llm_instrumented
 from app.graph.state import GraphState
 
 logger = logging.getLogger(__name__)
@@ -92,12 +91,18 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
     try:
         history_text = format_conversation_history(conversation_history)
 
+        tool_results = state.get("tool_results", []) or []
+        tool_text = ""
+        if tool_results:
+            tool_text = "Hasil tool yang tersedia:\n" + json.dumps(tool_results, ensure_ascii=False, default=str)[:3000] + "\n\n"
+
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", SUMMARIZER_PROMPT),
                 (
                     "human",
                     "{history_text}"
+                    "{tool_text}"
                     "Query pengguna: {query}\n"
                     "Tipe query: {intent}\n\n"
                     "Dokumen sumber:\n{documents}\n\n"
@@ -116,13 +121,22 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
         chain = prompt | llm
 
         logger.info("[Summarizer] Memanggil LLM untuk sintesis jawaban...")
-        response = invoke_with_retry(chain, {
-            "history_text": f"Riwayat percakapan sebelumnya:\n{history_text}\n\n" if history_text else "",
-            "query": query,
-            "intent": intent,
-            "documents": format_documents_for_prompt(documents, include_date=False),
-            "verified_claims": json.dumps(verified_claims, ensure_ascii=False),
-        })
+        usage_meta = dict(state.get("llm_usage", {}) or {})
+        response, usage_meta = invoke_llm_instrumented(
+            chain,
+            {
+                "history_text": f"Riwayat percakapan sebelumnya:\n{history_text}\n\n" if history_text else "",
+                "tool_text": tool_text,
+                "query": query,
+                "intent": intent,
+                "documents": format_documents_for_prompt(documents, include_date=False),
+                "verified_claims": json.dumps(verified_claims, ensure_ascii=False),
+            },
+            agent_name="summarizer",
+            task_type="reasoning",
+            max_retries=2,
+            usage_meta=usage_meta,
+        )
         logger.info("[Summarizer] LLM call selesai, parsing response...")
         response_text = _ensure_markdown_table(response.content)
         answer, citations = _parse_summarizer_response(response_text, documents)
@@ -146,7 +160,12 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
         answer = "Maaf, terjadi kesalahan dalam menyusun jawaban. Silakan coba lagi dengan pertanyaan yang berbeda."
         citations = []
 
-    return {**state, "final_answer": answer, "citations": citations}
+    return {
+        **state,
+        "final_answer": answer,
+        "citations": citations,
+        "llm_usage": dict(state.get("llm_usage", {}) or {}),
+    }
 
 
 def _parse_summarizer_response(

@@ -1,5 +1,6 @@
 -- EnterpriseMind AI Database Schema
 -- Urutan CREATE TABLE mengikuti dependency (referenced table dibuat lebih dulu).
+-- Ini adalah baseline fresh install. Perubahan incremental ada di app/db/migrations/*.sql.
 
 -- users: application users
 CREATE TABLE users (
@@ -7,11 +8,12 @@ CREATE TABLE users (
     email TEXT UNIQUE NOT NULL,
     full_name TEXT,
     password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user', 'analyst', 'viewer')),
+    role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     is_active BOOLEAN DEFAULT true,
     token_version INTEGER DEFAULT 1,
     department TEXT,
     clearance_level INTEGER DEFAULT 1,
+    must_change_password BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -23,10 +25,13 @@ CREATE TABLE documents (
     file_type TEXT NOT NULL CHECK (file_type IN ('pdf', 'docx', 'txt')),
     upload_date TIMESTAMPTZ DEFAULT NOW(),
     category TEXT DEFAULT 'uncategorized',
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'indexed', 'failed')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'indexed', 'failed', 'uploading', 'stored', 'deleting', 'delete_failed', 'deleted')),
     chunk_count INTEGER DEFAULT 0,
     storage_object_name TEXT,
     file_size_bytes BIGINT DEFAULT 0,
+    uploaded_by UUID REFERENCES users(id),
+    delete_error TEXT,
+    delete_retry_count INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -66,6 +71,10 @@ CREATE TABLE query_logs (
     reflection_count INTEGER DEFAULT 0,
     model_used TEXT,
     estimated_cost_usd FLOAT DEFAULT 0,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    usage_details JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -82,6 +91,16 @@ CREATE TABLE evaluation_results (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- parent_chunks: production parent-child storage
+CREATE TABLE IF NOT EXISTS parent_chunks (
+    id VARCHAR(255) PRIMARY KEY,
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    chunk_index INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- chunk_hashes: stored SHA-256 hashes of chunks for Tier-1 deduplication
 CREATE TABLE IF NOT EXISTS chunk_hashes (
     hash VARCHAR(64) PRIMARY KEY,
@@ -89,3 +108,15 @@ CREATE TABLE IF NOT EXISTS chunk_hashes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
+CREATE INDEX IF NOT EXISTS idx_documents_filename ON documents(filename);
+CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_documents_storage_object ON documents(storage_object_name);
+CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_query_logs_intent ON query_logs(intent);
+CREATE INDEX IF NOT EXISTS idx_query_logs_created ON query_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_parent_chunks_document ON parent_chunks(document_id);
+CREATE INDEX IF NOT EXISTS idx_chunk_hashes_document ON chunk_hashes(document_id);

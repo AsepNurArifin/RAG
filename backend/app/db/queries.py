@@ -1,4 +1,5 @@
 """Query log operations for dashboard metrics — PostgreSQL."""
+import json
 import logging
 from typing import Any
 
@@ -16,14 +17,18 @@ async def log_query(
     reflection_count: int = 0,
     model_used: str | None = None,
     estimated_cost_usd: float = 0.0,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    total_tokens: int = 0,
+    usage_details: dict | None = None,
 ) -> dict[str, Any]:
-    """Log query for dashboard metrics."""
-    import json
-
+    """Log query untuk dashboard metrics."""
     sql = """
         INSERT INTO query_logs (query, intent, agents_activated, latency_ms,
-                                confidence_score, reflection_count, model_used, estimated_cost_usd)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                                confidence_score, reflection_count, model_used,
+                                estimated_cost_usd, input_tokens, output_tokens,
+                                total_tokens, usage_details)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id, query, intent, created_at
     """
     result = await fetch_one(
@@ -36,5 +41,9 @@ async def log_query(
         reflection_count,
         model_used,
         estimated_cost_usd,
+        input_tokens,
+        output_tokens,
+        total_tokens,
+        json.dumps(usage_details or {}),
     )
     return result

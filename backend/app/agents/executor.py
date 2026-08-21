@@ -21,7 +21,7 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.agents import EXECUTOR_PROMPT
-from app.core.llm_provider import get_llm
+from app.core.llm_provider import get_llm, invoke_llm_instrumented
 from app.graph.state import GraphState
 
 logger = logging.getLogger(__name__)
@@ -64,11 +64,15 @@ def run_executor_agent(state: GraphState) -> GraphState:
     llm = get_llm("fast")
 
     chain = prompt | llm
-    response = chain.invoke(
-        {
+    response, _ = invoke_llm_instrumented(
+        chain=chain,
+        input_data={
             "query": query,
             "context": final_answer[:1000],
         },
+        agent_name="executor",
+        task_type="fast",
+        max_retries=2,
     )
 
     # Parse response

@@ -86,3 +86,21 @@ export interface UserData {
   is_active: boolean;
   created_at: string;
 }
+
+export interface UploadResponse {
+  workflow_id: string;
+  filename: string;
+  status: string;
+  message: string;
+}
+
+export interface WorkflowStatusResponse {
+  workflow_id: string;
+  status: string;
+  workflow_status: string;
+  started_at: string | null;
+  closed_at: string | null;
+  error: string | null;
+  document_id?: string;
+  chunk_count?: number;
+}

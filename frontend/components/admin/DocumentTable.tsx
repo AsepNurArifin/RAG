@@ -37,7 +37,7 @@ export function DocumentTable({ refreshTrigger }: { refreshTrigger: number }) {
   const handleDelete = async (id: string, filename: string) => {
     if (!confirm(`Hapus dokumen ${filename}?`)) return;
     try {
-      await api.deleteDocument(id, filename);
+      await api.deleteDocument(id);
       loadDocs();
     } catch (e) {
       alert("Gagal menghapus dokumen");

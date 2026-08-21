@@ -2,7 +2,7 @@
 PostgreSQL Client — EnterpriseMind AI.
 
 Async PostgreSQL connection pool using asyncpg.
-Replaces Supabase client for local/self-hosted deployment.
+Untuk deployment self-hosted (bukan Supabase managed service).
 
 Usage:
     from app.core.postgres_client import get_pool, execute_query, fetch_one, fetch_all

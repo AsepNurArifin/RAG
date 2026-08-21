@@ -111,6 +111,23 @@ class GraphState(TypedDict):
     Format: [{role, content, timestamp}]"""
 
     # ------------------------------------------------------------------ #
+    # Usage / Cost Tracking
+    # ------------------------------------------------------------------ #
+    llm_usage: dict
+    """Aggregate token usage & estimated cost per query.
+    Format: {input_tokens, output_tokens, total_tokens, estimated_cost_usd, generations}"""
+
+    trace_id: str | None
+    """ID trace observability untuk query ini (LangFuse optional)."""
+
+    # ------------------------------------------------------------------ #
+    # Tool Results
+    # ------------------------------------------------------------------ #
+    tool_results: list[dict]
+    """Hasil tool calls (calculator, metadata, web search).
+    Format: [{name, input, output, status, latency_ms}]"""
+
+    # ------------------------------------------------------------------ #
     # Error Handling
     # ------------------------------------------------------------------ #
     error: str | None

@@ -5,6 +5,9 @@ Groq provider — fast LPU inference.
 Dua model berdasarkan task:
 - task_type="fast" → GROQ_MODEL_FAST (routing, intent, query expansion)
 - task_type="reasoning" → GROQ_MODEL_REASONING (summarizer, verifier)
+
+Semua invoke LLM sebaiknya lewat invoke_with_retry() / invoke_llm_instrumented()
+agar usage token & cost tercatat serta bisa di-trace (LangFuse optional).
 """
 import logging
 import time
@@ -12,6 +15,11 @@ import time
 from langchain_groq import ChatGroq
 
 from app.core.config import settings
+from app.core.observability import (
+    accumulate_usage,
+    end_generation,
+    start_generation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +52,9 @@ def get_llm(
         model = settings.GROQ_MODEL_FAST
         temp = temperature
         if max_tokens is None:
-            max_tokens = 1024
+            # gpt-oss-20b adalah model reasoning — sebagian token dipakai untuk
+            # reasoning internal, jadi beri ruang cukup untuk jawaban aktual.
+            max_tokens = 2048
 
     logger.info(
         "Membuat LLM instance: model=%s, task_type=%s, temperature=%s, timeout=%ds",
@@ -111,3 +121,50 @@ def invoke_with_retry(chain, input_data: dict, max_retries: int = 3, base_delay:
     # All retries exhausted
     logger.error("[LLM] All %d retries exhausted. Last error: %s", max_retries, last_exception)
     raise last_exception
+
+
+def invoke_llm_instrumented(
+    chain,
+    input_data: dict,
+    agent_name: str = "llm",
+    task_type: str = "reasoning",
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    usage_meta: dict | None = None,
+    trace=None,
+) -> tuple[object, dict]:
+    """
+    Invoke LLM chain dengan retry + usage/cost tracking + optional tracing.
+
+    Returns:
+        (response, usage_meta) — usage_meta di-update in-place (aggregate).
+    """
+    if usage_meta is None:
+        usage_meta = {}
+    generation = start_generation(trace, name=f"llm_{agent_name}", meta={"task_type": task_type})
+
+    last_exception = None
+    result = None
+
+    for attempt in range(max_retries):
+        try:
+            t0 = time.time()
+            result = chain.invoke(input_data)
+            elapsed = time.time() - t0
+            logger.info("[LLM][%s] attempt %d/%d selesai dalam %.1fs", agent_name, attempt + 1, max_retries, elapsed)
+            accumulate_usage(usage_meta, result)
+            end_generation(generation, output=result.content if hasattr(result, "content") else result, meta={"status": "ok"})
+            return result, usage_meta
+        except Exception as e:
+            last_exception = e
+            error_msg = str(e)
+            logger.warning("[LLM][%s] attempt %d/%d gagal: %s", agent_name, attempt + 1, max_retries, error_msg[:200])
+            if "429" in error_msg or "rate_limit" in error_msg.lower() or "quota" in error_msg.lower():
+                time.sleep(base_delay * (2 ** attempt))
+            else:
+                break
+
+    end_generation(generation, output=None, meta={"status": "error", "error": str(last_exception)[:200]})
+    if last_exception is not None:
+        raise last_exception
+    raise RuntimeError("LLM invoke gagal tanpa exception.")

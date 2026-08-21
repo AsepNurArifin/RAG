@@ -1,7 +1,7 @@
 """
 Vector Store Wrapper — EnterpriseMind AI.
 
-Chroma wrapper for semantic search.
+Wrapper untuk semantic search di Milvus vector store.
 """
 import logging
 

@@ -1,0 +1,91 @@
+# EnterpriseMind AI — Production Compose Override
+# Menambahkan service backend (FastAPI) dan worker (Temporal) berbasis image
+# yang sama, menggunakan hostname internal service untuk dependencies.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Env wajib disediakan via environment / .env (jangan commit secret):
+#   GROQ_API_KEY, JWT_SECRET_KEY, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
+#   POSTGRES_PASSWORD, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enterprisemind_backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-Password}@postgres-app:5432/enterprisemind
+      MILVUS_URI: http://milvus:19530
+      DOCLING_URL: http://docling:5001
+      TEMPORAL_HOST: temporal:7233
+      MINIO_ENDPOINT: milvus-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET_DOCS: enterprisemind-docs
+      GROQ_API_KEY: ${GROQ_API_KEY:?GROQ_API_KEY wajib di-set}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY wajib di-set}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-30}
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    volumes:
+      - model_cache:/app/model_cache
+      - uploads_data:/app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    networks:
+      - enterprisemind_net
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enterprisemind_worker
+    restart: unless-stopped
+    command: ["python", "-m", "app.temporal.worker"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-Password}@postgres-app:5432/enterprisemind
+      MILVUS_URI: http://milvus:19530
+      DOCLING_URL: http://docling:5001
+      TEMPORAL_HOST: temporal:7233
+      MINIO_ENDPOINT: milvus-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET_DOCS: enterprisemind-docs
+      GROQ_API_KEY: ${GROQ_API_KEY:?GROQ_API_KEY wajib di-set}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY wajib di-set}
+    volumes:
+      - model_cache:/app/model_cache
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    networks:
+      - enterprisemind_net
+
+volumes:
+  model_cache:
+    driver: local
+  uploads_data:
+    driver: local

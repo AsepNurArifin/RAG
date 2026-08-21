@@ -22,12 +22,29 @@ def _safe_int(value: str, name: str) -> int:
         raise ValueError(f"Environment variable {name} harus berupa angka, menerima: '{value}'")
 
 
+def _safe_bool(value: str, name: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in ("1", "true", "yes", "on"):
+        return True
+    if normalized in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(f"Environment variable {name} harus bernilai boolean, menerima: '{value}'")
+
+
 @dataclass(frozen=True)
 class Settings:
     # LLM — Groq (fast inference)
     GROQ_API_KEY: str = field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
-    GROQ_MODEL_FAST: str = field(default_factory=lambda: os.getenv("GROQ_MODEL_FAST", "llama-3.1-8b-instant"))
-    GROQ_MODEL_REASONING: str = field(default_factory=lambda: os.getenv("GROQ_MODEL_REASONING", "llama-3.3-70b-versatile"))
+    GROQ_MODEL_FAST: str = field(default_factory=lambda: os.getenv("GROQ_MODEL_FAST", "openai/gpt-oss-20b"))
+    GROQ_MODEL_REASONING: str = field(default_factory=lambda: os.getenv("GROQ_MODEL_REASONING", "openai/gpt-oss-120b"))
+
+    # LLM token cost per 1M tokens (USD). Defaults ~ Groq pricing.
+    LLM_INPUT_COST_PER_MILLION_TOKENS: float = field(
+        default_factory=lambda: _safe_float(os.getenv("LLM_INPUT_COST_PER_MILLION_TOKENS", "0.25"), "LLM_INPUT_COST_PER_MILLION_TOKENS")
+    )
+    LLM_OUTPUT_COST_PER_MILLION_TOKENS: float = field(
+        default_factory=lambda: _safe_float(os.getenv("LLM_OUTPUT_COST_PER_MILLION_TOKENS", "0.80"), "LLM_OUTPUT_COST_PER_MILLION_TOKENS")
+    )
 
     # PostgreSQL
     DATABASE_URL: str = field(
@@ -82,10 +99,54 @@ class Settings:
     JWT_SECRET_KEY: str = field(default_factory=lambda: os.getenv("JWT_SECRET_KEY", ""))
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = field(default_factory=lambda: _safe_int(os.getenv("JWT_EXPIRE_MINUTES", "480"), "JWT_EXPIRE_MINUTES"))
+    JWT_SECRET_MIN_BYTES: int = 32
+
+    # Bootstrap admin (only used at startup; never store in repo)
+    BOOTSTRAP_ADMIN_EMAIL: str = field(default_factory=lambda: os.getenv("BOOTSTRAP_ADMIN_EMAIL", ""))
+    BOOTSTRAP_ADMIN_PASSWORD: str = field(default_factory=lambda: os.getenv("BOOTSTRAP_ADMIN_PASSWORD", ""))
+
+    # Conversation memory
+    CONVERSATION_HISTORY_LIMIT: int = field(
+        default_factory=lambda: _safe_int(os.getenv("CONVERSATION_HISTORY_LIMIT", "5"), "CONVERSATION_HISTORY_LIMIT")
+    )
+    CONVERSATION_HISTORY_MAX_CHARS: int = field(
+        default_factory=lambda: _safe_int(os.getenv("CONVERSATION_HISTORY_MAX_CHARS", "200"), "CONVERSATION_HISTORY_MAX_CHARS")
+    )
+
+    # Observability (LangFuse) — optional, non-critical
+    LANGFUSE_PUBLIC_KEY: str = field(default_factory=lambda: os.getenv("LANGFUSE_PUBLIC_KEY", ""))
+    LANGFUSE_SECRET_KEY: str = field(default_factory=lambda: os.getenv("LANGFUSE_SECRET_KEY", ""))
+    LANGFUSE_HOST: str = field(default_factory=lambda: os.getenv("LANGFUSE_HOST", ""))
+    LANGFUSE_ENABLED: bool = field(
+        default_factory=lambda: _safe_bool(os.getenv("LANGFUSE_ENABLED", "false"), "LANGFUSE_ENABLED")
+    )
+
+    # Tools
+    ENABLE_CALCULATOR: bool = field(
+        default_factory=lambda: _safe_bool(os.getenv("ENABLE_CALCULATOR", "true"), "ENABLE_CALCULATOR")
+    )
+    ENABLE_METADATA_TOOL: bool = field(
+        default_factory=lambda: _safe_bool(os.getenv("ENABLE_METADATA_TOOL", "true"), "ENABLE_METADATA_TOOL")
+    )
 
     def __post_init__(self):
-        if self.APP_ENV != "development" and not self.JWT_SECRET_KEY:
-            raise ValueError("JWT_SECRET_KEY wajib di-set di environment production!")
+        if not self.JWT_SECRET_KEY:
+            raise ValueError(
+                "JWT_SECRET_KEY wajib di-set di SEMUA environment (termasuk development). "
+                "Generate dengan: openssl rand -hex 32"
+            )
+        if len(self.JWT_SECRET_KEY.encode("utf-8")) < self.JWT_SECRET_MIN_BYTES:
+            raise ValueError(
+                f"JWT_SECRET_KEY terlalu pendek (minimal {self.JWT_SECRET_MIN_BYTES} byte). "
+                "Generate dengan: openssl rand -hex 32"
+            )
+
+
+def _safe_float(value: str, name: str) -> float:
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        raise ValueError(f"Environment variable {name} harus berupa angka, menerima: '{value}'")
 
 
 settings = Settings()

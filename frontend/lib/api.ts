@@ -1,4 +1,4 @@
-import { QueryResponse, Document, Session, Metrics, UserData, Message } from "../types";
+import { QueryResponse, Document, Session, Metrics, UserData, Message, UploadResponse, WorkflowStatusResponse } from "../types";
 
 // Base URL for the backend API.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -127,7 +127,7 @@ export const api = {
   // Documents (Admin)
   // ================================================================ //
 
-  async uploadDocument(file: File, category: string = "uncategorized"): Promise<Document> {
+  async uploadDocument(file: File, category: string = "uncategorized"): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("category", category);
@@ -149,15 +149,21 @@ export const api = {
     return response.json();
   },
 
+  async getWorkflowStatus(workflowId: string): Promise<WorkflowStatusResponse> {
+    const response = await authFetch(`${API_BASE_URL}/workflows/${workflowId}`);
+    if (!response.ok) throw new Error("Failed to fetch workflow status");
+    return response.json();
+  },
+
   async getDocuments(): Promise<Document[]> {
     const response = await authFetch(`${API_BASE_URL}/documents`);
     if (!response.ok) throw new Error("Failed to fetch documents");
     return response.json();
   },
 
-  async deleteDocument(id: string, filename: string): Promise<void> {
+  async deleteDocument(id: string): Promise<void> {
     const response = await authFetch(
-      `${API_BASE_URL}/documents/${id}?filename=${encodeURIComponent(filename)}`,
+      `${API_BASE_URL}/documents/${id}`,
       { method: "DELETE" }
     );
     if (!response.ok) throw new Error("Failed to delete document");

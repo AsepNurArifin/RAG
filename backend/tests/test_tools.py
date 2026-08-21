@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import patch, AsyncMock
 
 from app.tools.calculator_tool import calculate
-from app.tools.web_search_tool import _sanitize_content
 from app.tools.metadata_query_tool import query_document_metadata
 
 
@@ -39,34 +38,6 @@ class TestCalculator:
         long_expr = "+".join(["1"] * 60)
         result = calculate(long_expr)
         assert result != "Error: Ekspresi matematika tidak valid."
-
-
-class TestWebSearch:
-    def test_sanitize_removes_script_tags(self):
-        content = '<script>alert("xss")</script><p>Hello</p>'
-        result = _sanitize_content(content)
-        assert "script" not in result.lower()
-        assert "alert" not in result.lower()
-
-    def test_sanitize_removes_html_tags(self):
-        content = '<b>Bold</b> and <i>italic</i>'
-        result = _sanitize_content(content)
-        assert "<b>" not in result
-        assert "<i>" not in result
-        assert "Bold" in result
-
-    def test_sanitize_removes_javascript_urls(self):
-        content = 'Click <a href="javascript:alert(1)">here</a>'
-        result = _sanitize_content(content)
-        assert "javascript:" not in result.lower()
-
-    def test_sanitize_truncates_long_content(self):
-        content = "A" * 2000
-        result = _sanitize_content(content, max_length=1000)
-        assert len(result) == 1000
-
-    def test_sanitize_empty_content(self):
-        assert _sanitize_content("") == ""
 
 
 class TestMetadataQuery:

@@ -6,6 +6,8 @@ import { api } from "../../lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELED", "TERMINATED", "TIMED_OUT"]);
+
 export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () => void }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -32,12 +34,34 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
     setStatus(null);
 
     try {
-      await api.uploadDocument(file, category);
-      setStatus({ type: "success", message: `Dokumen "${file.name}" berhasil diproses & di-index.` });
-      // Beri waktu 1.5 detik agar Temporal Worker sempat mencatat dokumen ke Database
-      setTimeout(() => {
-        onUploadComplete();
-      }, 1500);
+      const upload = await api.uploadDocument(file, category);
+
+      // Poll status workflow hingga terminal (indexed/failed) dengan backoff.
+      const delays = [1500, 2500, 4000, 6000, 8000];
+      let workflowStatus: string | null = null;
+      let workflowError: string | null = null;
+
+      for (const delay of delays) {
+        await new Promise((r) => setTimeout(r, delay));
+        try {
+          const wf = await api.getWorkflowStatus(upload.workflow_id);
+          workflowStatus = wf.status;
+          workflowError = wf.error || null;
+          if (TERMINAL_STATUSES.has(wf.status)) break;
+        } catch {
+          // Workflow mungkin belum terdaftar; lanjut polling.
+        }
+      }
+
+      const isIndexed = workflowStatus === "COMPLETED";
+      if (isIndexed) {
+        setStatus({ type: "success", message: `Dokumen "${file.name}" berhasil di-index.` });
+      } else if (workflowStatus === "FAILED") {
+        setStatus({ type: "error", message: `Dokumen "${file.name}" gagal diproses: ${workflowError || "unknown error"}` });
+      } else {
+        setStatus({ type: "success", message: `Dokumen "${file.name}" dijadwalkan (${workflowStatus || "queued"}). Cek tabel dokumen.` });
+      }
+      onUploadComplete();
     } catch (error) {
       setStatus({ type: "error", message: error instanceof Error ? error.message : "Gagal mengupload dokumen." });
     } finally {

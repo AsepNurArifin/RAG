@@ -1,3 +1,13 @@
+import os
+
+# Config membutuhkan JWT_SECRET_KEY di semua environment. Set default test
+# sebelum modul app di-import agar import app.main / app.core.config tidak gagal.
+os.environ.setdefault(
+    "JWT_SECRET_KEY",
+    "test-only-secret-0123456789abcdef0123456789abcdef0123456789abcdef",
+)
+os.environ.setdefault("APP_ENV", "development")
+
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 from langchain_core.messages import AIMessage

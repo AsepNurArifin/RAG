@@ -39,6 +39,7 @@ Thumbs.db
 .pytest_cache/
 htmlcov/
 .coverage
+.xml.coverage
 
 # Distribution
 dist/
@@ -62,18 +63,56 @@ docker-compose.override.yml
 # Project-specific
 # ============================================
 
-# Test PDF files (JANGAN commit test data)
-*.pdf
+# --- Secrets & credentials (redundan, jaga-jaga) ---
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.jks
+*.keystore
+*.secret
+!cacert.pem
 
-# Debug/test scripts (dibuat saat development)
+# --- Dokumen internal / materi training (SANGAT SENSITIF, PT) ---
+# Jangan commit dokumen asli milik perusahaan ke repo publik.
+docs/
+*.pdf
+*.pptx
+*.docx
+*.xlsx
+
+# --- Dokumentasi internal (.md) — HANYA README yang boleh di-commit ---
+# Dokumentasi arsitektur/planning adalah catatan internal, tidak untuk publik.
+*.md
+!README.md
+!backend/README.md
+!frontend/README.md
+
+# --- Graphify output (berisi cuplikan isi dokumen + cache) ---
+graphify-out/
+
+# --- Diagram / artefak hasil generate (review dulu sebelum commit) ---
+output*.png
+
+# --- Debug/test scripts (dibuat saat development) ---
 backend/test_*.py
 backend/diag_test.py
 backend/test_debug_pipeline.py
 backend/test_hybrid_extractor.py
 backend/test_pipeline.py
 
-# User uploads
+# --- User uploads ---
 backend/uploads/
 
-# Chroma local (jika persist ke disk)
+# --- Chroma local (jika persist ke disk) ---
 backend/chroma_db/
+
+# --- Milvus / Temporal local data ---
+milvus_data/
+temporal_data/
+
+# --- Tool lokasi bundle mudah bocor (jika ada di masa depan) ---
+*.log.*
+.DS_Store
+Thumbs.db

@@ -39,19 +39,20 @@ COPY --from=builder /app/.venv /app/.venv
 # Salin kode aplikasi kamu
 COPY --chown=appuser:appuser . .
 
-# Siapkan folder lokal untuk ChromaDB dan Uploads dengan permission yang benar
-RUN mkdir -p /app/chroma_db /app/uploads \
+# Siapkan folder untuk model cache dan uploads dengan permission yang benar
+RUN mkdir -p /app/uploads /app/model_cache \
     && chown -R appuser:appuser /app
 
 # Daftarkan path virtual environment ke PATH sistem agar binary uvicorn langsung terbaca
 ENV PATH="/app/.venv/bin:$PATH"
+ENV HF_HOME=/app/model_cache
 
 USER appuser
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/health/live || exit 1
 
 # Panggil langsung uvicorn dari virtual environment yang sudah diaktifkan di PATH
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

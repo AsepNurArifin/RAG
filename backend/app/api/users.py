@@ -11,7 +11,6 @@ Endpoints:
     DELETE /api/users/{id}  — Hapus user
 """
 import logging
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -64,8 +63,8 @@ async def create_user(body: CreateUserRequest, admin: dict = Depends(require_adm
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email sudah terdaftar.")
 
-    if body.role not in ("admin", "user", "analyst", "viewer"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role tidak valid.")
+    if body.role not in ("admin", "user"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role tidak valid. Hanya 'admin' atau 'user'.")
 
     query = """
         INSERT INTO users (email, password_hash, full_name, role, is_active)
@@ -95,8 +94,8 @@ async def update_user(
         params.append(body.full_name)
         idx += 1
     if body.role is not None:
-        if body.role not in ("admin", "user", "analyst", "viewer"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role tidak valid.")
+        if body.role not in ("admin", "user"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role tidak valid. Hanya 'admin' atau 'user'.")
         update_parts.append(f"role = ${idx}")
         params.append(body.role)
         idx += 1

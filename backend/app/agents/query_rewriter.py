@@ -123,9 +123,9 @@ def expand_query_llm(query: str, intent_type: str) -> str:
     LLM-based expansion (~0.3s, $0.0001).
     Hanya dipanggil untuk comprehensive/ambiguous queries.
     """
-    from app.core.llm_provider import get_llm
+    from app.core.llm_provider import get_llm, invoke_llm_instrumented
 
-    llm = get_llm("fast", temperature=0.3, max_tokens=512)
+    llm = get_llm("fast", temperature=0.3, max_tokens=1024)
 
     prompt = f"""You are a query expansion engine. Output ONLY comma-separated terms, nothing else.
 No explanation, no preamble, no markdown. Just the terms.
@@ -144,7 +144,9 @@ Intent: {intent_type}
 Output:"""
 
     try:
-        response = llm.invoke(prompt)
+        response, _ = invoke_llm_instrumented(
+            chain=llm, input_data=prompt, agent_name="query_expansion", task_type="fast", max_retries=2,
+        )
         response_text = response.content.strip()
         # Strip conversational preamble
         if "\n\n" in response_text:

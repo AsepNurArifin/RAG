@@ -381,8 +381,6 @@ export default function UsersPage() {
               >
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
-                <option value="analyst">Analyst</option>
-                <option value="viewer">Viewer</option>
               </select>
             </div>
             <DialogFooter className="pt-4">
@@ -430,8 +428,6 @@ export default function UsersPage() {
                 >
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
-                  <option value="analyst">Analyst</option>
-                  <option value="viewer">Viewer</option>
                 </select>
               </div>
               <div className="flex items-center gap-3.5 pt-2">

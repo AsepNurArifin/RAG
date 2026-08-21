@@ -8,8 +8,8 @@ Parent-Child Chunking Strategy:
 Flow:
 1. Split dokumen jadi parent chunks (2000 chars, overlap 400)
 2. Split setiap parent jadi child chunks (500 chars, overlap 100)
-3. Embed HANYA child chunks ke Chroma
-4. Simpan parent chunks di storage (Chroma metadata / PostgreSQL)
+3. Embed HANYA child chunks ke Milvus
+4. Simpan parent chunks di storage (Milvus metadata / PostgreSQL)
 5. Saat retrieval: ambil child → resolve parent → kirim parent ke LLM
 
 Hash-based Deduplication:

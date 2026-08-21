@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from pydantic import BaseModel
 
-from app.core.auth import create_access_token, get_current_user, verify_password
+from app.core.auth import create_access_token, get_current_user, verify_password, hash_password
 from app.core.postgres_client import fetch_one, execute_query
 from app.core.config import settings
 
@@ -25,14 +25,44 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
     user: dict
+
+
+async def bootstrap_admin_if_needed() -> None:
+    """
+    Buat admin awal dari environment BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD.
+
+    Hanya berjalan ketika kedua variable diset. Tidak mengubah password admin
+    yang sudah ada. Dipanggil saat startup sehingga deployment fresh tidak perlu
+    menanamkan credential default di repository.
+    """
+    email = settings.BOOTSTRAP_ADMIN_EMAIL.strip()
+    password = settings.BOOTSTRAP_ADMIN_PASSWORD
+
+    if not email or not password:
+        return
+
+    existing = await fetch_one("SELECT id FROM users WHERE email = $1", email)
+    if existing:
+        logger.info("Bootstrap admin dilewati: %s sudah terdaftar.", email)
+        return
+
+    if len(password) < 12:
+        raise ValueError("BOOTSTRAP_ADMIN_PASSWORD harus minimal 12 karakter.")
+
+    await execute_query(
+        """
+        INSERT INTO users (email, full_name, password_hash, role, is_active, department, clearance_level)
+        VALUES ($1, $2, $3, 'admin', true, 'IT', 5)
+        """,
+        email, "System Admin", hash_password(password),
+    )
+    logger.info("Bootstrap admin dibuat: %s", email)
 
 
 @router.post("/login", response_model=LoginResponse)
 async def login(body: LoginRequest, response: Response):
-    """Login. Returns JWT token with RBAC fields. Sets HTTPOnly cookie."""
+    """Login. Sets HTTPOnly cookie. Token tidak dikembalikan di response body."""
     query = """
         SELECT id, email, full_name, role, is_active, token_version,
                department, clearance_level, password_hash
@@ -68,7 +98,6 @@ async def login(body: LoginRequest, response: Response):
     )
 
     return LoginResponse(
-        access_token=token,
         user={
             "id": str(user["id"]),
             "email": user["email"],

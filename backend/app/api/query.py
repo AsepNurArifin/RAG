@@ -18,8 +18,8 @@ from slowapi.util import get_remote_address
 
 from app.core.config import settings
 from app.core.auth import get_current_user, get_user_rbac_filter
-from app.core.postgres_client import fetch_one, fetch_all, execute_query
 from app.db import log_query, save_message
+from app.db.messages import get_or_create_user_conversation, get_messages_for_session
 from app.graph.build_graph import build_agent_graph
 
 logger = logging.getLogger(__name__)
@@ -71,10 +71,39 @@ async def process_query(
             # RBAC filter from user profile
             rbac_filter = get_user_rbac_filter(user)
 
+            user_id = str(user["id"])
+
+            # Resolusi conversation + history. Harus dilakukan SEBELUM graph
+            # agar konteks percakapan sebelumnya tersedia untuk LLM.
+            # Ownership divalidasi: session milik user lain → tidak dipakai.
+            conversation_id = None
+            conversation_history = []
+            try:
+                conv = await get_or_create_user_conversation(
+                    body.session_id, user_id, title=body.query[:60] + ("..." if len(body.query) > 60 else ""),
+                )
+                if conv is None:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Session ini milik user lain. Buat session baru.",
+                    )
+                conversation_id = str(conv["id"])
+                conversation_history = await get_messages_for_session(
+                    body.session_id,
+                    user_id,
+                    limit=settings.CONVERSATION_HISTORY_LIMIT,
+                    max_chars=settings.CONVERSATION_HISTORY_MAX_CHARS,
+                )
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.warning("Gagal memuat history conversation: %s", e)
+                conversation_history = []
+
             initial_state = {
                 "query": body.query,
                 "session_id": body.session_id,
-                "user_id": str(user["id"]),
+                "user_id": user_id,
                 "user_department": user.get("department", "") or "",
                 "user_clearance_level": user.get("clearance_level", 1) or 1,
                 "rbac_filter": rbac_filter,
@@ -93,7 +122,10 @@ async def process_query(
                 "final_answer": "",
                 "citations": [],
                 "action_items": [],
-                "conversation_history": [],
+                "conversation_history": conversation_history,
+                "llm_usage": {},
+                "trace_id": None,
+                "tool_results": [],
                 "error": None,
                 "query_deadline": time.time() + settings.QUERY_TIMEOUT_SECONDS,
             }
@@ -164,44 +196,48 @@ async def process_query(
 
             # Log query
             try:
+                usage = current_state.get("llm_usage", {}) or {}
                 await log_query(
                     query=body.query, intent=current_state.get("intent", ""),
                     agents_activated=current_state.get("agents_to_activate", []),
                     latency_ms=elapsed_ms, confidence_score=current_state.get("confidence_score", 0),
                     reflection_count=current_state.get("reflection_count", 0),
                     model_used=settings.GROQ_MODEL_REASONING,
+                    estimated_cost_usd=usage.get("estimated_cost_usd", 0.0),
+                    input_tokens=usage.get("input_tokens", 0),
+                    output_tokens=usage.get("output_tokens", 0),
+                    total_tokens=usage.get("total_tokens", 0),
+                    usage_details=usage,
                 )
             except Exception as e:
                 logger.warning("Gagal log query: %s", e)
 
             # Save conversation
             try:
-                title = body.query[:60] + ("..." if len(body.query) > 60 else "")
-
-                # Check if conversation exists
-                conv = await fetch_one(
-                    "SELECT id FROM conversations WHERE session_id = $1",
-                    body.session_id,
-                )
-
-                if conv:
-                    conversation_id = str(conv["id"])
-                else:
-                    conv = await fetch_one(
-                        "INSERT INTO conversations (session_id, user_id, title) VALUES ($1, $2, $3) RETURNING id",
-                        body.session_id, str(user["id"]), title,
+                # Reuse conversation_id yang sudah di-resolve sebelum graph.
+                # Jika belum ada (mis. gagal load history), fallback ownership-aware.
+                if not conversation_id:
+                    conv = await get_or_create_user_conversation(
+                        body.session_id,
+                        str(user["id"]),
+                        title=body.query[:60] + ("..." if len(body.query) > 60 else ""),
                     )
-                    conversation_id = str(conv["id"])
+                    if conv is None:
+                        logger.warning("Session milik user lain, pesan tidak disimpan.")
+                        conversation_id = None
+                    else:
+                        conversation_id = str(conv["id"])
 
-                await save_message(conversation_id=conversation_id, role="user", content=body.query)
-                await save_message(
-                    conversation_id=conversation_id, role="assistant",
-                    content=current_state.get("final_answer", ""),
-                    citations=current_state.get("citations", []),
-                    confidence_score=current_state.get("confidence_score", 0),
-                    action_items=current_state.get("action_items", []),
-                    latency_ms=elapsed_ms, model_used=settings.GROQ_MODEL_REASONING,
-                )
+                if conversation_id:
+                    await save_message(conversation_id=conversation_id, role="user", content=body.query)
+                    await save_message(
+                        conversation_id=conversation_id, role="assistant",
+                        content=current_state.get("final_answer", ""),
+                        citations=current_state.get("citations", []),
+                        confidence_score=current_state.get("confidence_score", 0),
+                        action_items=current_state.get("action_items", []),
+                        latency_ms=elapsed_ms, model_used=settings.GROQ_MODEL_REASONING,
+                    )
             except Exception as e:
                 logger.warning("Gagal menyimpan pesan ke DB: %s", e)
 
