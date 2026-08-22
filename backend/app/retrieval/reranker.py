@@ -5,7 +5,10 @@ Rerank retrieved documents using cross-encoder model untuk
 meningkatkan Context Precision.
 
 Model: BAAI/bge-reranker-v2-m3
-Pipeline: Hybrid Search (20 docs) → Reranker → Top 5
+Pipeline: Hybrid Search (kandidat adaptive) → Reranker → Top-k
+Catatan: top_k default 5, tapi call site di retriever.py memakai
+RERANK_TOP_K = 10. Angka final sebelum parent resolution ditentukan
+oleh pemanggil (retriever.py), bukan default di sini.
 
 Singleton pattern untuk lazy loading model.
 """

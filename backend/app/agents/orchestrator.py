@@ -3,20 +3,29 @@ Orchestrator Agent — EnterpriseMind AI.
 
 Analyze user query intent and route to appropriate agents.
 Uses tiered intent classifier (Rule → Keyword → LLM) for efficiency.
+
+KONTRAK INTENT (dua lapisan):
+- Raw intent  : output `classify_intent()` di intent_classifier.py
+                (greeting/factual/comprehensive/analytical/procedural/
+                comparison/action_request/out_of_scope/ambiguous).
+- Operational : output INTENT_MAP di bawah, yang dipakai routing graph.
+                HANYA 4 nilai: informational/analytical/action_request/out_of_scope.
+
+Routing behavior (graph/build_graph.py):
+- out_of_scope      → langsung ke Summarizer
+- action_request    → retrieval flow + Executor setelah Summarizer
+- informational / analytical → retrieval flow biasa
 """
-import json
 import logging
 
-from langchain_core.prompts import ChatPromptTemplate
-
-from app.agents import ORCHESTRATOR_PROMPT
 from app.agents.intent_classifier import classify_intent
-from app.core.llm_provider import get_llm
 from app.graph.state import GraphState
 
 logger = logging.getLogger(__name__)
 
-# Map intent classifier output to orchestrator intent format
+# Map intent classifier output to orchestrator intent format.
+# KONTRAK: semua raw intent di VALID_INTENTS + "ambiguous" HARUS ter-mapping ke
+# salah satu dari 4 operational intent. Dijaga oleh test_orchestrator.py.
 INTENT_MAP = {
     "greeting": "out_of_scope",
     "factual": "informational",

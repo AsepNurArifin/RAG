@@ -10,7 +10,7 @@ Alur graph lengkap:
                                    └── confidence < threshold → Reflection (reformulasi query)
                                                                  → Researcher (ulang)
                                                                  → Verifier (ulang)
-                                                                 → ... (maks 2 iterasi)
+                                                                 → ... (maks 1 iterasi)
                                                                  → Summarizer + disclaimer → END
 
 Ref: FR2 di SRS_PRD.md, ARCHITECTURE.md diagram alur query
@@ -200,7 +200,7 @@ def _route_after_verifier(state: GraphState) -> str:
     """
     Routing setelah Verifier: ke Summarizer atau Reflection loop.
 
-    Ref: FR2.5 — Reflection loop jika confidence rendah, maks 2 iterasi.
+    Ref: FR2.5 — Reflection loop jika confidence rendah, maks 1 iterasi.
     """
     needs_reflection = state.get("needs_reflection", False)
     reflection_count = state.get("reflection_count", 0)

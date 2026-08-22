@@ -11,7 +11,7 @@
 | **Fact Verification** | Verifier Agent + Confidence Scoring + Reflection Loop (max 1 iterasi, optimized) |
 | **Citation & Source Tracing** | Setiap klaim disertai sitasi ke dokumen sumber yang dapat ditelusuri |
 | **Action Generation** | Executor Agent menghasilkan draft action items dari query |
-| **Enterprise UI** | Next.js 16 + React 19 + Tailwind v4 + Process Rail + Confidence Indicator |
+| **Enterprise UI** | Next.js 16.2.10 + React 19.2.4 + Tailwind v4 + Process Rail + Confidence Indicator |
 | **Observability** | LangFuse tracing per-agent (optional; enabled bila `LANGFUSE_ENABLED=true`), token usage & cost tracking di `query_logs` |
 | **RAGAS Evaluation** | Evaluasi otomatis: Faithfulness, Answer Relevance, Context Precision, Recall |
 | **Security-Aware** | Prompt injection mitigation, tool read-only scoping, rate limiting |
@@ -47,12 +47,12 @@
  │  │  │                       ▼                     │ │   │
  │  │  │                  ┌─────────┐               │ │   │
  │  │  │                  │Verifier │               │ │   │
- │  │  │                  │(70B LLM)│               │ │   │
+ │  │  │                  │(120B)   │               │ │   │
  │  │  │                  └────┬────┘               │ │   │
  │  │  │                       ▼                     │ │   │
  │  │  │  ┌──────────┐    ┌──────────┐             │ │   │
  │  │  │  │Summrizr  │◄───│Reflection│             │ │   │
- │  │  │  │(70B LLM) │    │(max 1)   │             │ │   │
+ │  │  │  │(120B)    │    │(max 1)   │             │ │   │
  │  │  │  └────┬─────┘    └──────────┘             │ │   │
  │  │  │       ▼                                    │ │   │
  │  │  │  ┌─────────┐                              │ │   │
@@ -88,7 +88,9 @@ User Query
     │
     ▼
 Orchestrator ──→ Intent Classification (Tiered: Regex → Keyword → LLM)
-    │              (factual / analytical / comparison / comprehensive / action_request / greeting / ambiguous)
+    │              Raw: greeting / factual / comprehensive / analytical / procedural / comparison
+    │                   / action_request / out_of_scope / ambiguous
+    │              → Operational: informational / analytical / action_request / out_of_scope
     ▼
 Retriever ──→ Query Expansion (Dictionary-based atau LLM untuk comprehensive/ambiguous)
     │
@@ -101,15 +103,15 @@ Retriever ──→ Query Expansion (Dictionary-based atau LLM untuk comprehensi
     Parent Resolution ──→ Resolve parent chunks (2000 chars) dari child (500 chars)
           │
           ▼
-Verifier ──→ Confidence Scoring + Fact Check (LLM 70B)
+Verifier ──→ Confidence Scoring + Fact Check (gpt-oss-120b)
     │            ├─ Score ≥ 0.6 → Summarizer
     │            └─ Score < 0.6 → Reflection (max 1x, reformulasi query)
     │                              └→ Retriever (ulang)
     ▼
-Summarizer ──→ Jawaban Akhir + Sitasi (LLM 70B)
+Summarizer ──→ Jawaban Akhir + Sitasi (gpt-oss-120b)
     │              └─ Jika intent=action_request → Executor
     ▼
-Executor ──→ Action Items (draft email / to-do list, LLM 8B)
+Executor ──→ Action Items (draft email / to-do list, gpt-oss-20b)
     │              └─ Requires Human Review ✓
     ▼
 Response ke User (final_answer, citations, confidence_score, latency_ms, action_items)
@@ -150,7 +152,7 @@ Response ke User (final_answer, citations, confidence_score, latency_ms, action_
 | **Workflow Engine** | Temporal (Docker) | Latest |
 | **Document Parser** | Docling + PyMuPDF4LLM + RapidOCR | Latest |
 | **Backend** | FastAPI + Python | 0.115.0 + 3.11 |
-| **Frontend** | Next.js + React + Tailwind | 16.1 + 19 + 4.0 |
+| **Frontend** | Next.js + React + Tailwind | 16.2.10 + 19.2.4 + 4.0 |
 | **Embedding Model** | BGE-M3 (HuggingFace) | BAAI/bge-m3 (1024-dim) |
 | **Reranker** | BGE-Reranker-v2-m3 | BAAI/bge-reranker-v2-m3 |
 | **Stemmer** | Sastrawi (Bahasa Indonesia) | 1.0.1+ |
@@ -223,7 +225,7 @@ npm run dev
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 - **Temporal UI**: http://localhost:8081
-- **MinIO Console**: http://localhost:9001 (minioadmin / minioadmin)
+- **MinIO Console**: http://localhost:9001 (milvus-minio — dipakai Milvus untuk penyimpanan vektor & minio_client untuk document storage; endpoint app `localhost:9000`)
 
 ### Evaluasi RAGAS
 ```bash
@@ -255,13 +257,14 @@ Sistem telah dioptimasi untuk performa maksimal di laptop 8GB RAM:
 
 | Optimasi | Dampak | File |
 |---|---|---|
-| **Parent Embedding Skip** | Ingestion -30% waktu (parent chunks tidak di-embed) | `embedder.py:89` |
-| **Sastrawi LRU Cache** | Query -50% untuk dokumen yang sering di-retrieve | `hybrid_search.py:63` |
-| **Exponential Backoff Turun** | Rate limit recovery 2× lebih cepat (2s→1s base) | `llm_provider.py:101` |
-| **Reflection Loop 2→1** | Worst case query -30 detik | `config.py:50` |
-| **Batch Embedding** | BGE-M3 default batch_size=32 (bukan 1-by-1) | `embedder.py` |
+| **Parent Embedding Skip** | Parent chunk disimpan tanpa embed (hemat biaya embedding) | `embedder.py:89` |
+| **Sastrawi LRU Cache** | Tokenisasi di-cache; tercatat <1s (sebelum ~35s) di `hybrid_search.py:66` | `hybrid_search.py:74` |
+| **Exponential Backoff** | Retry dengan `base_delay * 2^attempt` | `llm_provider.py:77` |
+| **Reflection Loop 2→1** | Worst-case query dipangkas 1 iterasi | `config.py:70` |
+| **Batch Embedding** | BGE-M3 embedding dalam batch | `embedder.py` |
 
-Detail lengkap: **[OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md)**
+> Angka dampak persentase di README versi lama (‑30%, ‑50%, 2×) belum terukur ulang.
+> Status `[UNMEASURED]` dan cara validasinya ada di **[OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md)**.
 
 ## Struktur Repositori
 
@@ -269,39 +272,43 @@ Detail lengkap: **[OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md)**
 EnterpriseMind_AI/
 ├── backend/
 │   ├── app/
-│   │   ├── agents/        # Orchestrator, Retriever, Verifier, Summarizer, Executor
-│   │   ├── api/           # FastAPI routes (/query, /upload, /documents, /metrics)
-│   │   ├── core/          # config.py, llm_provider.py, postgres_client.py
-│   │   ├── db/            # CRUD functions (documents, messages, queries)
+│   │   ├── agents/        # orchestrator, intent_classifier, query_rewriter, retriever, verifier, summarizer, executor, utils
+│   │   ├── api/           # FastAPI routes: auth, query, upload, documents, metrics, sessions, users, workflows
+│   │   ├── core/          # config, auth (JWT), llm_provider, postgres_client, minio_client, observability, health
+│   │   ├── db/            # CRUD functions (documents, messages, queries, users) + migrations
 │   │   ├── evaluation/    # RAGAS runner + test set (50+ Q&A)
-│   │   ├── graph/         # LangGraph state + build_graph
-│   │   ├── ingestion/     # extractor, chunker, embedder, pipeline
-│   │   ├── retrieval/     # hybrid_search, reranker, parent_resolver
+│   │   ├── graph/         # LangGraph state + build_graph (satu-satunya tempat routing)
+│   │   ├── ingestion/     # extractor, chunker (parent 2000/400 + child 500/100), embedder, pipeline
+│   │   ├── retrieval/     # hybrid_search, reranker, parent_resolver, vector_store, stopwords_id
 │   │   ├── temporal/      # Temporal workflows + activities + worker
 │   │   ├── memory/        # conversation_memory
-│   │   └── tools/         # calculator, metadata_query (web search DILARANG)
+│   │   └── tools/         # calculator_tool, metadata_query_tool, tool_router (web search DILARANG)
 │   ├── scripts/           # run_evaluation, build_naive_rag, load_test
 │   ├── tests/             # Unit tests
 │   ├── Dockerfile
-│   ├── docker-compose.yml     # Infra: Milvus, Temporal, PostgreSQL, MinIO, Docling (8 service)
+│   ├── docker-compose.yml     # Infra: milvus-etcd, milvus-minio, milvus, temporal-db, temporal, postgres-app, temporal-ui, docling (8 service)
 │   └── docker-compose.prod.yml# Prod: + service backend (FastAPI) & worker (Temporal)
 ├── frontend/
-│   ├── app/               # (chat), admin, admin/metrics
-│   ├── components/        # ChatWindow, MessageBubble, CitationCard, ProcessRail, DocumentUploader
-│   ├── context/           # ActiveAgentContext
+│   ├── app/               # (chat), admin, admin/users, login
+│   ├── components/        # ChatWindow, MessageBubble, CitationCard, ErrorBoundary, LoadingIndicator
+│   │   ├── layout/        # SideNavBar, UserSideNavBar, ProcessRail
+│   │   ├── admin/         # DocumentTable, DocumentUploader, MetricsPanel
+│   │   ├── auth/          # (kosong)
+│   │   └── ui/            # shadcn/ui primitives (button, card, dialog, table, dsb.)
+│   ├── context/           # ActiveAgentContext, AuthContext
 │   ├── hooks/             # useChatStream
-│   └── lib/               # api.ts, utils.ts
-├── docs/                  # 13 dokumen HR training (PDF/PPTX)
+│   ├── lib/               # api.ts, utils.ts
+│   └── types/             # index.ts
+├── docs/                  # 13 dokumen HR training (PDF/PPTX) — knowledge base
 ├── ARCHITECTURE.md        # Arsitektur detail + constraints
-├── OPTIMIZATION_PLAN.md   # **BARU**: Performance optimizations detail
+├── OPTIMIZATION_PLAN.md   # Performance optimizations detail
 ├── AI_RULES.md            # Aturan untuk AI coding agent
 ├── CODING_STANDARDS.md    # Konvensi kode
-├── DECISION_LOG.md        # ADR (15+ keputusan teknis)
+├── DECISION_LOG.md        # ADR (keputusan teknis)
 ├── DEFINITION_OF_DONE.md  # Checklist selesai task
 ├── DEPLOYMENT.md          # Panduan deploy production
 ├── PROMPT_LIBRARY.md      # System prompt tiap agent
 ├── SECURITY.md            # Keamanan agentic RAG
-├── CHANGELOG.md           # Version history
 └── EnterpriseMind_AI_SRS_PRD.md  # Full requirements specification
 ```
 
@@ -310,12 +317,11 @@ EnterpriseMind_AI/
 | File | Deskripsi |
 |---|---|
 | **[ARCHITECTURE.md](ARCHITECTURE.md)** | Arsitektur sistem, constraints, trade-offs |
-| **[OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md)** | 4 optimasi performa dengan analisis mendalam |
 | **[CODING_STANDARDS.md](CODING_STANDARDS.md)** | Konvensi kode Python & TypeScript |
 | **[DECISION_LOG.md](DECISION_LOG.md)** | Architecture Decision Records (ADR) |
 | **[DEPLOYMENT.md](DEPLOYMENT.md)** | Panduan deploy VPS + Vercel |
 | **[SECURITY.md](SECURITY.md)** | Keamanan: prompt injection, RBAC, rate limiting |
-| **[PROMPT_LIBRARY.md](PROMPT_LIBRARY.md)** | System prompts untuk 5 agents |
+| **[PROMPT_LIBRARY.md](PROMPT_LIBRARY.md)** | System prompts untuk tiap agent |
 | **[EnterpriseMind_AI_SRS_PRD.md](EnterpriseMind_AI_SRS_PRD.md)** | Requirements lengkap |
 
 ## Kontributor

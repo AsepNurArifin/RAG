@@ -91,10 +91,6 @@ class Settings:
     MINIO_SECRET_KEY: str = field(default_factory=lambda: os.getenv("MINIO_SECRET_KEY", "minioadmin"))
     MINIO_BUCKET_DOCS: str = field(default_factory=lambda: os.getenv("MINIO_BUCKET_DOCS", "enterprisemind-docs"))
 
-    # Chunking
-    CHUNK_SIZE: int = field(default_factory=lambda: _safe_int(os.getenv("CHUNK_SIZE", "1000"), "CHUNK_SIZE"))
-    CHUNK_OVERLAP: int = field(default_factory=lambda: _safe_int(os.getenv("CHUNK_OVERLAP", "200"), "CHUNK_OVERLAP"))
-
     # JWT
     JWT_SECRET_KEY: str = field(default_factory=lambda: os.getenv("JWT_SECRET_KEY", ""))
     JWT_ALGORITHM: str = "HS256"

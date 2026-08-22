@@ -3,6 +3,11 @@ EnterpriseMind AI — Agents Package.
 
 Agent logic. Routing hanya di graph/build_graph.py.
 """
+# KONTRAK: klasifikasi intent aktual dilakukan oleh classify_intent()
+# (intent_classifier.py — tiered RegEx/Keyword/LLM) di orchestrator.py.
+# Prompt di bawah adalah kontrak konseptual/fallback LLM; taxonomy operational
+# yang dipakai routing graph adalah 4 nilai: informational/analytical/
+# action_request/out_of_scope (lihat INTENT_MAP di orchestrator.py).
 ORCHESTRATOR_PROMPT = """Kamu adalah Orchestrator Agent dalam sistem EnterpriseMind AI.
 Tugasmu: menganalisis query pengguna dan menentukan agent mana yang perlu diaktifkan.
 

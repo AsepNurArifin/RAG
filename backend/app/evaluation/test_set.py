@@ -42,7 +42,7 @@ TEST_SET = [
     },
     {
         "question": "Berapa batas maksimum iterasi reflection loop?",
-        "ground_truth": "Reflection loop dibatasi maksimal 2 iterasi. Jika setelah 2 iterasi confidence score masih di bawah threshold (0.6), sistem tetap melanjutkan ke Summarizer dengan disclaimer kejujuran bahwa informasi mungkin tidak lengkap.",
+        "ground_truth": "Reflection loop dibatasi maksimal 1 iterasi (MAX_REFLECTION_ITERATIONS = 1 di config.py). Jika setelah 1 iterasi confidence score masih di bawah threshold (0.6), sistem tetap melanjutkan ke Summarizer dengan disclaimer kejujuran bahwa informasi mungkin tidak lengkap.",
     },
     {
         "question": "Apa saja metrik evaluasi yang digunakan oleh RAGAS?",
@@ -50,7 +50,7 @@ TEST_SET = [
     },
     {
         "question": "Bagaimana strategi chunking dokumen di sistem?",
-        "ground_truth": "Sistem menggunakan strategi semantic/hierarchical chunking (bukan fixed-size naive split) dengan RecursiveCharacterTextSplitter, ukuran chunk 1000 karakter dengan overlap 200 karakter, untuk menjaga konteks semantik antar potongan dokumen.",
+        "ground_truth": "Sistem menggunakan parent-child chunking (bukan fixed-size naive split) dengan RecursiveCharacterTextSplitter: parent chunk 2000 karakter (overlap 400) untuk konteks LLM, child chunk 500 karakter (overlap 100) untuk embedding dan retrieval, untuk menjaga konteks semantik antar potongan dokumen.",
     },
     {
         "question": "Apa perbedaan antara Milvus dan PostgreSQL dalam arsitektur sistem?",
@@ -113,7 +113,7 @@ TEST_SET = [
     },
     {
         "question": "Evaluasi trade-off antara latensi dan akurasi dalam desain multi-agent system ini.",
-        "ground_truth": "Trade-off: Multi-agent dengan 4-5 LLM call meningkatkan akurasi (verifikasi, sintesis, reflection) tapi menambah latensi. Mitigasi: (1) Hybrid model — task ringan pakai gpt-oss-20b (cepat/murah), task berat pakai gpt-oss-120b (lambat/tapi akurat). (2) Reflection loop dibatasi maks 2 iterasi dengan timeout 12 detik. (3) Out-of-scope query langsung ke Summarizer tanpa Researcher/Verifier. Target latensi: ≤4 detik simple, ≤12 detik kompleks.",
+        "ground_truth": "Trade-off: Multi-agent dengan 4-5 LLM call meningkatkan akurasi (verifikasi, sintesis, reflection) tapi menambah latensi. Mitigasi: (1) Hybrid model — task ringan pakai gpt-oss-20b (cepat/murah), task berat pakai gpt-oss-120b (lambat/tapi akurat). (2) Reflection loop dibatasi maks 1 iterasi. (3) Out-of-scope query langsung ke Summarizer tanpa Researcher/Verifier. Target latensi: ≤4 detik simple, ≤12 detik kompleks.",
     },
     {
         "question": "Bandingkan strategi keamanan EnterpriseMind AI dengan sistem RAG pada umumnya.",
@@ -160,7 +160,7 @@ TEST_SET = [
     },
     {
         "question": "Berapa ukuran chunk dokumen yang digunakan — 500 atau 1000 karakter?",
-        "ground_truth": "Ukuran chunk adalah 1000 karakter dengan overlap 200 karakter. Menggunakan RecursiveCharacterTextSplitter dengan strategi semantic/hierarchical chunking, bukan fixed-size 500 karakter.",
+        "ground_truth": "Sistem menggunakan parent-child chunking: parent chunk 2000 karakter (overlap 400) untuk konteks LLM, dan child chunk 500 karakter (overlap 100) untuk embedding dan retrieval. Menggunakan RecursiveCharacterTextSplitter dengan strategi parent-child. Bukan fixed-size 1000 karakter.",
     },
     {
         "question": "Apakah sistem menggunakan Chroma atau pgvector untuk vector search?",
@@ -176,7 +176,7 @@ TEST_SET = [
     },
     {
         "question": "Apakah reflection loop dibatasi 2 atau 3 iterasi?",
-        "ground_truth": "Reflection loop dibatasi maksimal 2 iterasi (MAX_REFLECTION_ITERATIONS = 2 di config.py). Juga ada timeout keras QUERY_TIMEOUT_SECONDS = 12 detik untuk mencegah infinite loop.",
+        "ground_truth": "Reflection loop dibatasi maksimal 1 iterasi (MAX_REFLECTION_ITERATIONS = 1 di config.py). Ada juga deadline keras QUERY_TIMEOUT_SECONDS = 180 detik untuk mencegah proses menggantung.",
     },
     # ================================================================ #
     # KATEGORI 4: OUT-OF-SCOPE (5 pertanyaan — menguji sistem bilang "tidak tahu")

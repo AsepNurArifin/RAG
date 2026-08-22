@@ -23,7 +23,6 @@ def mock_llm(monkeypatch):
         return mock_chatgroq
         
     monkeypatch.setattr("app.core.llm_provider.get_llm", get_mock_llm)
-    monkeypatch.setattr("app.agents.orchestrator.get_llm", get_mock_llm)
     monkeypatch.setattr("app.agents.verifier.get_llm", get_mock_llm)
     monkeypatch.setattr("app.agents.summarizer.get_llm", get_mock_llm)
     monkeypatch.setattr("app.agents.executor.get_llm", get_mock_llm)

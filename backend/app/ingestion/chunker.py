@@ -68,7 +68,9 @@ SEPARATORS = [
     "",
 ]
 
-# Chunk sizes
+# Chunk sizes — SATU-SATUNYA sumber kebenaran untuk parent-child chunking.
+# Konfigurasi ini TIDAK diambil dari env/config.py (di-remove karena ambigu).
+# Ubah di sini jika ingin menyesuaikan ukuran chunk, lalu update evaluasi.
 PARENT_CHUNK_SIZE = 2000
 PARENT_CHUNK_OVERLAP = 400
 CHILD_CHUNK_SIZE = 500
