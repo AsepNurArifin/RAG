@@ -251,21 +251,6 @@ pytest tests/ -v
 
 Lihat **[DEPLOYMENT.md](DEPLOYMENT.md)** untuk panduan deploy lengkap ke VPS + Vercel.
 
-## Performance Optimizations
-
-Sistem telah dioptimasi untuk performa maksimal di laptop 8GB RAM:
-
-| Optimasi | Dampak | File |
-|---|---|---|
-| **Parent Embedding Skip** | Parent chunk disimpan tanpa embed (hemat biaya embedding) | `embedder.py:89` |
-| **Sastrawi LRU Cache** | Tokenisasi di-cache; tercatat <1s (sebelum ~35s) di `hybrid_search.py:66` | `hybrid_search.py:74` |
-| **Exponential Backoff** | Retry dengan `base_delay * 2^attempt` | `llm_provider.py:77` |
-| **Reflection Loop 2→1** | Worst-case query dipangkas 1 iterasi | `config.py:70` |
-| **Batch Embedding** | BGE-M3 embedding dalam batch | `embedder.py` |
-
-> Angka dampak persentase di README versi lama (‑30%, ‑50%, 2×) belum terukur ulang.
-> Status `[UNMEASURED]` dan cara validasinya ada di **[OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md)**.
-
 ## Struktur Repositori
 
 ```text
@@ -301,7 +286,6 @@ EnterpriseMind_AI/
 │   └── types/             # index.ts
 ├── docs/                  # 13 dokumen HR training (PDF/PPTX) — knowledge base
 ├── ARCHITECTURE.md        # Arsitektur detail + constraints
-├── OPTIMIZATION_PLAN.md   # Performance optimizations detail
 ├── AI_RULES.md            # Aturan untuk AI coding agent
 ├── CODING_STANDARDS.md    # Konvensi kode
 ├── DECISION_LOG.md        # ADR (keputusan teknis)

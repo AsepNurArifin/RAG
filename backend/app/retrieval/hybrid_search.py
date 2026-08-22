@@ -77,7 +77,6 @@ def _cached_tokenize(text: str) -> frozenset:
     Cached version of tokenization.
     LRU cache: 200 most recent unique texts.
     Dokumen yang sering di-retrieve tidak perlu di-stem ulang.
-    Ref: OPTIMIZATION_PLAN.md P3
     """
     words = re.findall(r"\w+", text.lower())
     synonyms = _load_synonyms()

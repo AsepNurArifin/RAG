@@ -92,7 +92,6 @@ def _insert_parents_directly(texts: list[str], metadatas: list[dict], ids: list[
 
     Menghindari LangChain Milvus.add_texts() yang selalu menjalankan embedding.
     Juga menghindari inisialisasi AsyncMilvusClient yang gagal di thread worker.
-    Ref: OPTIMIZATION_PLAN.md P1
     """
     from pymilvus import connections, Collection, utility, DataType
 
