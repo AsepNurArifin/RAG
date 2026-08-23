@@ -89,27 +89,32 @@ export const api = {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
+
         const parts = buffer.split("\n\n");
         buffer = parts.pop() || ""; // Keep the incomplete part
 
         for (const part of parts) {
-          if (part.startsWith("data: ")) {
-            const dataStr = part.substring(6);
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.type === "agent") {
-                onAgentUpdate(data.agent);
-              } else if (data.type === "result") {
-                receivedResult = true;
-                onResult(data);
-              } else if (data.type === "error") {
-                receivedResult = true;
-                onError(new Error(data.message));
-              }
-            } catch (e) {
-              console.error("Parse error:", e);
+          // Handle both "data: ..." and possible leading whitespace/newlines.
+          const trimmed = part.trim();
+          if (!trimmed.startsWith("data:")) continue;
+
+          const dataStr = trimmed.substring(5).trim();
+          if (!dataStr) continue;
+
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.type === "agent") {
+              onAgentUpdate(data.agent);
+            } else if (data.type === "result") {
+              receivedResult = true;
+              onResult(data);
+            } else if (data.type === "error") {
+              receivedResult = true;
+              onError(new Error(data.message || "Terjadi kesalahan sistem."));
             }
+            // "heartbeat" diabaikan — hanya keepalive agar koneksi tidak terputus.
+          } catch (e) {
+            console.error("Parse error:", e);
           }
         }
       }
@@ -152,6 +157,19 @@ export const api = {
   async getWorkflowStatus(workflowId: string): Promise<WorkflowStatusResponse> {
     const response = await authFetch(`${API_BASE_URL}/workflows/${workflowId}`);
     if (!response.ok) throw new Error("Failed to fetch workflow status");
+    return response.json();
+  },
+
+  async getDocumentFile(documentId: string): Promise<{ url: string; filename: string; document_id: string; expires_in_seconds: number }> {
+    const response = await authFetch(`${API_BASE_URL}/documents/${documentId}/file`);
+    if (!response.ok) {
+      let errorMessage = "Failed to fetch document file";
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.detail || errorMessage;
+      } catch (e) {}
+      throw new Error(errorMessage);
+    }
     return response.json();
   },
 

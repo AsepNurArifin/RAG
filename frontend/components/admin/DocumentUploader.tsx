@@ -10,42 +10,36 @@ const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELED", "TERMINATE
 
 export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () => void }) {
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<"upload" | "processing" | "polling">("upload");
   const [status, setStatus] = useState<{ type: "success" | "error", message: string } | null>(null);
   const [category, setCategory] = useState("policies");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!isUploading) {
-      setUploadProgress(0);
-      return;
-    }
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => Math.min(prev + 5, 90));
-    }, 300);
-    return () => clearInterval(interval);
-  }, [isUploading]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
+    setUploadPhase("upload");
     setStatus(null);
 
     try {
+      setUploadPhase("upload");
       const upload = await api.uploadDocument(file, category);
+      setUploadPhase("polling");
 
       // Poll status workflow hingga terminal (indexed/failed) dengan backoff.
-      const delays = [1500, 2500, 4000, 6000, 8000];
+      const delays = [1500, 2500, 4000, 6000, 8000, 10000];
       let workflowStatus: string | null = null;
       let workflowError: string | null = null;
+      let workflowDomain: string | null = null;
 
       for (const delay of delays) {
         await new Promise((r) => setTimeout(r, delay));
         try {
           const wf = await api.getWorkflowStatus(upload.workflow_id);
           workflowStatus = wf.status;
+          workflowDomain = wf.workflow_status || null;
           workflowError = wf.error || null;
           if (TERMINAL_STATUSES.has(wf.status)) break;
         } catch {
@@ -53,21 +47,21 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
         }
       }
 
-      const isIndexed = workflowStatus === "COMPLETED";
+      const isIndexed = workflowStatus === "COMPLETED" && workflowDomain !== "failed";
       if (isIndexed) {
         setStatus({ type: "success", message: `Dokumen "${file.name}" berhasil di-index.` });
-      } else if (workflowStatus === "FAILED") {
+      } else if (workflowStatus === "FAILED" || workflowDomain === "failed") {
         setStatus({ type: "error", message: `Dokumen "${file.name}" gagal diproses: ${workflowError || "unknown error"}` });
       } else {
-        setStatus({ type: "success", message: `Dokumen "${file.name}" dijadwalkan (${workflowStatus || "queued"}). Cek tabel dokumen.` });
+        setStatus({ type: "success", message: `Dokumen "${file.name}" dijadwalkan (${workflowStatus || "queued"}). Cek tabel dokumen untuk status akhir.` });
       }
       onUploadComplete();
     } catch (error) {
       setStatus({ type: "error", message: error instanceof Error ? error.message : "Gagal mengupload dokumen." });
     } finally {
       setIsUploading(false);
+      setUploadPhase("upload");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      setUploadProgress(0);
     }
   };
 
@@ -100,11 +94,17 @@ export function DocumentUploader({ onUploadComplete }: { onUploadComplete: () =>
             <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
             <div className="w-full max-w-xs bg-slate-200 rounded-full h-2 overflow-hidden">
               <div
-                className="bg-[#0077ff] h-full rounded-full transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
+                className="bg-[#0077ff] h-full rounded-full transition-all duration-1000"
+                style={{ width: uploadPhase === "upload" ? "25%" : uploadPhase === "polling" ? "60%" : "100%" }}
               />
             </div>
-            <p className="text-[#0077ff] text-xs sm:text-sm font-medium">{uploadProgress}% — Sedang mengekstrak teks...</p>
+            <p className="text-[#0077ff] text-xs sm:text-sm font-medium">
+              {uploadPhase === "upload"
+                ? "Mengunggah ke server..."
+                : uploadPhase === "polling"
+                ? "Memproses dokumen di background (ekstraksi & indexing)..."
+                : "Menyelesaikan..."}
+            </p>
           </div>
         ) : (
           <label className="flex flex-col items-center justify-center cursor-pointer">

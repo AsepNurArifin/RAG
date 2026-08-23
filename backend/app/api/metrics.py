@@ -65,7 +65,7 @@ async def get_dashboard_metrics(admin: dict = Depends(require_admin)) -> dict:
 
     except Exception as e:
         logger.exception("Gagal mengambil metrik")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Gagal mengambil metrik dashboard.")
 
 
 def _empty_metrics() -> dict:

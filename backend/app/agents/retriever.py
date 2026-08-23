@@ -87,7 +87,10 @@ def _build_parent_store(parent_ids: list[str]) -> dict[str, dict]:
     try:
         store = get_vector_store()
         ids_str = ", ".join(f'"{pid}"' for pid in parent_ids)
-        expr = f"parent_id in [{ids_str}]"
+        # Filter chunk_type="parent" agar lookup hanya mengambil parent chunk.
+        # Tanpa filter ini, child juga punya parent_id sehingga bisa menimpa
+        # parent_store dengan konten pendek (child) → context rusak.
+        expr = f'parent_id in [{ids_str}] and chunk_type == "parent"'
 
         # Query fields yang ADA di schema (bukan "metadata" yang tidak ada)
         query_fields = ["text", "parent_id", "child_id", "chunk_type", 

@@ -35,6 +35,11 @@ export function UserSideNavBar({ onNewChat, onToggleSidebar, isSidebarOpen = fal
 
   useEffect(() => {
     loadSessions();
+
+    // Refresh daftar sesi saat ChatWindow membuat sesi baru (tanpa reload).
+    const handleSessionCreated = () => loadSessions();
+    window.addEventListener("emind:session-created", handleSessionCreated);
+    return () => window.removeEventListener("emind:session-created", handleSessionCreated);
   }, []);
 
   const loadSessions = async () => {

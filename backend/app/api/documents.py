@@ -35,7 +35,54 @@ async def list_documents(user: dict = Depends(get_current_user)) -> list[dict]:
         return docs
     except Exception as e:
         logger.exception("Gagal mengambil list dokumen")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Gagal mengambil daftar dokumen.")
+
+
+@router.get("/documents/{document_id}/file")
+async def get_document_file(
+    document_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """
+    Generate presigned URL untuk mengakses file asli dari MinIO.
+
+    Dipakai oleh UI: ketika user mengklik sitasi, file asli dibuka di tab baru
+    untuk validasi langsung terhadap dokumen sumber.
+
+    Keamanan:
+        - Wajib login (get_current_user).
+        - storage_object_name selalu diambil dari database, BUKAN dari client.
+        - URL presigned ber-TTL pendek (default 1 jam) agar tidak abadi.
+    """
+    from app.core.minio_client import minio_client
+
+    doc = await fetch_one(
+        "SELECT id, filename, storage_object_name, status FROM documents WHERE id = $1",
+        document_id,
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Dokumen tidak ditemukan.")
+    if doc.get("status") != "indexed":
+        raise HTTPException(status_code=409, detail="Dokumen belum selesai diindeks.")
+
+    storage_object_name = doc.get("storage_object_name")
+    if not storage_object_name:
+        raise HTTPException(status_code=404, detail="File asli tidak ditemukan di storage.")
+
+    try:
+        url = await asyncio.to_thread(
+            minio_client.get_presigned_url, storage_object_name, 3600
+        )
+    except Exception as e:
+        logger.exception("Gagal generate URL file %s: %s", document_id, e)
+        raise HTTPException(status_code=500, detail="Gagal mengakses file. Coba lagi nanti.")
+
+    return {
+        "document_id": str(doc["id"]),
+        "filename": doc.get("filename"),
+        "url": url,
+        "expires_in_seconds": 3600,
+    }
 
 
 @router.delete("/documents/{document_id}")

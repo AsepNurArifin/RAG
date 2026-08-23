@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Citation } from "../types";
-import { FileText, CheckCircle2, Clock } from "lucide-react";
+import { FileText, CheckCircle2, Clock, ExternalLink } from "lucide-react";
+import { api } from "../lib/api";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -12,15 +14,24 @@ interface CitationCardProps {
 }
 
 export function CitationCard({ citation, index }: CitationCardProps) {
+  const [isOpening, setIsOpening] = useState(false);
   const source = citation.source || `REF-${index}`;
   const excerpt = citation.excerpt || "No excerpt available.";
   const relevance = citation.relevance_score ?? 0;
   const date = citation.date || "";
 
-  const handleClick = () => {
-    if (citation.source) {
-      const el = document.getElementById(`citation-${index}`);
-      el?.scrollIntoView({ behavior: "smooth" });
+  const handleClick = async () => {
+    if (!citation.document_id) return;
+
+    setIsOpening(true);
+    try {
+      const data = await api.getDocumentFile(citation.document_id);
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("Failed to open source file:", err);
+      alert("Gagal membuka file asli. Coba lagi nanti.");
+    } finally {
+      setIsOpening(false);
     }
   };
 
@@ -37,6 +48,7 @@ export function CitationCard({ citation, index }: CitationCardProps) {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
+        title={citation.document_id ? "Klik untuk membuka file asli" : undefined}
       >
         <CardHeader className="p-4 pb-2 relative">
           <div className="absolute top-0 right-0 bg-[#0077ff]/10 text-[#0077ff] px-3 py-1 text-[10px] font-mono font-medium rounded-bl-lg border-b border-l border-[#0077ff]/20">
@@ -47,6 +59,9 @@ export function CitationCard({ citation, index }: CitationCardProps) {
             <span className="font-semibold text-sm uppercase line-clamp-1 break-all" title={source}>
               {source}
             </span>
+            {citation.document_id && (
+              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+            )}
           </div>
         </CardHeader>
 
@@ -72,6 +87,9 @@ export function CitationCard({ citation, index }: CitationCardProps) {
               <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 gap-1 rounded-sm px-1.5 py-0.5">
                 <Clock className="w-3 h-3" /> PENDING
               </Badge>
+            )}
+            {isOpening && (
+              <span className="text-[10px] text-[#0077ff] animate-pulse">membuka...</span>
             )}
           </div>
         </CardFooter>

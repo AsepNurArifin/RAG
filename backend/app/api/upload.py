@@ -147,4 +147,4 @@ async def upload_document(
         raise
     except Exception as e:
         logger.exception("Upload gagal: %s", file.filename)
-        raise HTTPException(status_code=500, detail=f"Gagal memproses dokumen: {str(e)}") from e
+        raise HTTPException(status_code=500, detail="Gagal memproses dokumen. Coba lagi nanti.") from e

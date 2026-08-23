@@ -3,6 +3,7 @@ export interface Citation {
   date: string;
   excerpt: string;
   relevance_score: number;
+  document_id?: string;
 }
 
 export interface ActionItem {

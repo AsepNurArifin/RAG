@@ -12,12 +12,16 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.agents import VERIFIER_PROMPT
-from app.agents.utils import format_documents_for_prompt
+from app.agents.utils import format_documents_for_prompt, truncate_documents_for_budget
 from app.core.config import settings
 from app.core.llm_provider import get_llm, invoke_llm_instrumented
 from app.graph.state import GraphState
 
 logger = logging.getLogger(__name__)
+
+# Budget context Verifier. gpt-oss-120b tier free TPM ~8000; Verifier + Summarizer
+# memakai model yang sama dalam satu window. Batasi context agar tidak 413.
+VERIFIER_MAX_DOC_CHARS = 7000
 
 
 def run_verifier_agent(state: GraphState) -> GraphState:
@@ -40,6 +44,21 @@ def run_verifier_agent(state: GraphState) -> GraphState:
         }
 
     try:
+        # Budget control: batasi context agar tidak melampaui TPM provider.
+        # Jumlah dokumen asli disimpan untuk confidence (doc_bonus) agar tidak
+        # terdistorsi oleh truncation.
+        original_doc_count = len(documents)
+        documents = truncate_documents_for_budget(
+            documents,
+            max_total_chars=VERIFIER_MAX_DOC_CHARS,
+            per_doc_max_chars=2500,
+        )
+        if len(documents) < original_doc_count:
+            logger.info(
+                "[Verifier] Context dibatasi: %d/%d dokumen dipakai (budget %d chars)",
+                len(documents), original_doc_count, VERIFIER_MAX_DOC_CHARS,
+            )
+
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", VERIFIER_PROMPT),
@@ -68,6 +87,7 @@ def run_verifier_agent(state: GraphState) -> GraphState:
             task_type="reasoning",
             max_retries=2,
             usage_meta=usage_meta,
+            deadline=state.get("query_deadline"),
         )
         state = {**state, "llm_usage": usage_meta}
         logger.info("[Verifier] LLM call selesai, parsing response...")
@@ -91,7 +111,7 @@ def run_verifier_agent(state: GraphState) -> GraphState:
         avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
         normalized_relevance = min(1.0, avg_relevance / 0.5) if avg_relevance > 0 else 0.0
 
-        doc_bonus = min(len(documents) / 3.0, 1.0)
+        doc_bonus = min(original_doc_count / 3.0, 1.0)
         penalty = min(0.05 * len(flagged_issues), 0.15)
 
         objective_confidence = (

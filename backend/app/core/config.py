@@ -70,6 +70,12 @@ class Settings:
     MAX_REFLECTION_ITERATIONS: int = 1
     QUERY_TIMEOUT_SECONDS: int = 180
 
+    # Jeda antar node LLM berat (Verifier → Summarizer) agar tidak melampaui
+    # TPM provider (gpt-oss-120b tier free ~8000 TPM). Detik.
+    LLM_NODE_COOLDOWN_SECONDS: int = field(
+        default_factory=lambda: _safe_int(os.getenv("LLM_NODE_COOLDOWN_SECONDS", "5"), "LLM_NODE_COOLDOWN_SECONDS")
+    )
+
     # Application
     APP_ENV: str = field(default_factory=lambda: os.getenv("APP_ENV", "development"))
     APP_HOST: str = field(default_factory=lambda: os.getenv("APP_HOST", "0.0.0.0"))

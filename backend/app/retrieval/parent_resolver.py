@@ -115,7 +115,9 @@ def build_parent_store_from_chroma(milvus_store, parent_ids: list[str]) -> dict[
     try:
         # Query Milvus untuk parent chunks
         ids_str = ", ".join(f'"{pid}"' for pid in parent_ids)
-        expr = f"parent_id in [{ids_str}]"
+        # Filter chunk_type="parent" agar child (yang punya parent_id sama)
+        # tidak menimpa parent_store dengan konten pendek.
+        expr = f'parent_id in [{ids_str}] and chunk_type == "parent"'
         
         # Query fields yang ADA di schema (bukan "metadata" yang tidak ada)
         query_fields = ["text", "parent_id", "child_id", "chunk_type", 

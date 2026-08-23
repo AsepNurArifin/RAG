@@ -175,10 +175,15 @@ def embed_and_store_parent_child(
             for i, meta in enumerate(parent_metadatas)
         ]
 
-        try:
-            _insert_parents_directly(parent_texts, parent_metadatas, parent_ids)
-        except Exception as e:
-            logger.warning("Gagal store parent chunks: %s", e)
+        written = _insert_parents_directly(parent_texts, parent_metadatas, parent_ids)
+        if written <= 0:
+            # Parent diharapkan tersimpan, tapi tidak ada yang berhasil ditulis.
+            # Jangan lanjut ke child insert dalam keadaan parent orphan/parsial —
+            # biarkan pipeline menandai status 'failed' (bukan 'indexed' parsial).
+            raise RuntimeError(
+                f"Gagal menyimpan parent chunks (0/{len(parent_texts)} tertulis). "
+                "Ingestion dibatalkan untuk mencegah status 'indexed' parsial."
+            )
 
     # Store child chunks (di-embed untuk retrieval)
     child_texts = [chunk.content for chunk in child_chunks]

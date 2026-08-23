@@ -30,6 +30,11 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
 
   useEffect(() => {
     onSessionChange?.(sessionId);
+    // Ketika sesi baru dibuat (sessionId berubah), beri tahu sidebar
+    // agar refresh daftar riwayat tanpa perlu reload halaman.
+    if (sessionId) {
+      window.dispatchEvent(new CustomEvent("emind:session-created", { detail: { sessionId } }));
+    }
   }, [sessionId, onSessionChange]);
 
   useEffect(() => {

@@ -3,6 +3,7 @@ MinIO storage client — EnterpriseMind AI.
 Replaces Google Drive client for local/self-hosted deployment.
 """
 import logging
+from datetime import timedelta
 from minio import Minio
 from app.core.config import settings
 
@@ -93,5 +94,29 @@ class MinIOClient:
             logger.info("Successfully deleted %s from MinIO.", object_name)
         except Exception as e:
             logger.exception("Failed to delete %s from MinIO: %s", object_name, e)
+
+    def get_presigned_url(self, object_name: str, expires_seconds: int = 3600) -> str:
+        """
+        Generate presigned GET URL untuk mengakses object (file asli) dari MinIO.
+
+        Args:
+            object_name: Object key di MinIO (mis. 'documents/{uuid}.pdf').
+            expires_seconds: Masa berlaku URL dalam detik (default 1 jam).
+
+        Returns:
+            URL presigned yang bisa dibuka langsung di browser/tab baru.
+        """
+        bucket_name = settings.MINIO_BUCKET_DOCS
+        try:
+            url = self.client.presigned_get_object(
+                bucket_name=bucket_name,
+                object_name=object_name,
+                expires=timedelta(seconds=expires_seconds),
+            )
+            logger.info("Generated presigned URL untuk %s (expires=%ds)", object_name, expires_seconds)
+            return url
+        except Exception as e:
+            logger.exception("Gagal generate presigned URL untuk %s: %s", object_name, e)
+            raise
 
 minio_client = MinIOClient()

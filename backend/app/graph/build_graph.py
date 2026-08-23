@@ -61,7 +61,7 @@ def build_agent_graph() -> StateGraph:
     graph.add_node("tools", _timed_node(run_tool_node, "Tools"))
     graph.add_node("researcher", _timed_node(run_retriever_agent, "Researcher"))
     graph.add_node("verifier", _timed_node(run_verifier_agent, "Verifier"))
-    graph.add_node("summarizer", _timed_node(run_summarizer_agent, "Summarizer"))
+    graph.add_node("summarizer", _cooldown_node(run_summarizer_agent, "Summarizer", settings.LLM_NODE_COOLDOWN_SECONDS))
     graph.add_node("executor", _timed_node(run_executor_agent, "Executor"))
     graph.add_node("reflection", _reflection_node)
 
@@ -172,6 +172,23 @@ def _timed_node(func, name: str):
                 "error": f"{name} error: {str(e)}",
                 "final_answer": f"Maaf, terjadi kesalahan di {name}: {str(e)}",
             }
+    return wrapper
+
+
+def _cooldown_node(func, name: str, cooldown_seconds: float):
+    """Wrapper _timed_node + jeda (cooldown) sebelum node dijalankan.
+
+    Dipakai untuk node LLM berat berurutan (mis. Summarizer setelah Verifier)
+    agar request token tidak melampaui TPM provider dalam satu window yang sama.
+    """
+    timed = _timed_node(func, name)
+
+    async def wrapper(state: GraphState):
+        if cooldown_seconds > 0:
+            logger.info("[%s] Cooldown %.1fs sebelum start (rate limit TPM)...", name, cooldown_seconds)
+            await asyncio.sleep(cooldown_seconds)
+        return await timed(state)
+
     return wrapper
 
 

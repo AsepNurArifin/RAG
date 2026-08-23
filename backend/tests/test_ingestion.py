@@ -217,6 +217,37 @@ class TestChunker:
                 if word.strip()
             )
 
+    def test_parent_child_id_namespaced_by_document_id(self):
+        """Parent/child ID harus memakai document_id agar dua dokumen dengan
+        filename sama tidak menghasilkan ID vector yang bentrok."""
+        from app.ingestion.chunker import chunk_document_parent_child
+
+        text = "Paragraf kebijakan WFH.\n\n" * 30
+        metadata_a = {"filename": "policy.pdf", "document_id": "11111111-1111-1111-1111-111111111111"}
+        metadata_b = {"filename": "policy.pdf", "document_id": "22222222-2222-2222-2222-222222222222"}
+
+        parents_a, children_a = chunk_document_parent_child(text, metadata_a)
+        parents_b, children_b = chunk_document_parent_child(text, metadata_b)
+
+        # ID namespace memakai document_id, bukan filename
+        assert "11111111-1111" in parents_a[0].metadata["parent_id"]
+        assert "22222222-2222" in parents_b[0].metadata["parent_id"]
+
+        # Dua dokumen dengan filename sama TIDAK boleh punya ID yang sama
+        ids_a = {pc.metadata["parent_id"] for pc in parents_a} | {cc.metadata["child_id"] for cc in children_a}
+        ids_b = {pc.metadata["parent_id"] for pc in parents_b} | {cc.metadata["child_id"] for cc in children_b}
+        assert ids_a.isdisjoint(ids_b)
+
+    def test_parent_child_id_fallback_to_filename(self):
+        """Tanpa document_id (data legacy), fallback ke filename agar tetap unik."""
+        from app.ingestion.chunker import chunk_document_parent_child
+
+        text = "Paragraf kebijakan cuti.\n\n" * 30
+        parents, children = chunk_document_parent_child(text, {"filename": "legacy.pdf"})
+
+        assert "legacy.pdf" in parents[0].metadata["parent_id"]
+        assert "legacy.pdf" in children[0].metadata["child_id"]
+
 
 # ------------------------------------------------------------------ #
 # Embedder Tests

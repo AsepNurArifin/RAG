@@ -74,6 +74,12 @@ async def get_workflow_status(
                 response["document_id"] = result.get("document_id")
                 response["chunk_count"] = result.get("chunk_count", 0)
                 response["error"] = result.get("error")
+                # Workflow dapat berakhir COMPLETED tetapi result berisi status
+                # "failed" (kegagalan internal yang ditangkap workflow, bukan
+                # exception Temporal). Jangan laporkan sebagai 'indexed'.
+                if result.get("status") == "failed":
+                    domain_status = "failed"
+                    response["workflow_status"] = domain_status
         except Exception as e:
             response["error"] = str(e)[:200]
 

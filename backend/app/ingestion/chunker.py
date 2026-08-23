@@ -220,6 +220,11 @@ def chunk_document_parent_child(
         raise ValueError("Teks dokumen kosong, tidak bisa di-chunk.")
 
     filename = metadata.get("filename", "unknown")
+    # Namespace ID memakai document_id bila tersedia (mencegah collision antar
+    # dokumen dengan filename sama). Fallback ke filename untuk kompatibilitas
+    # data lama yang diindeks sebelum document_id tersedia di metadata.
+    id_namespace = metadata.get("document_id") or metadata.get("id") or filename
+    id_namespace = str(id_namespace)
 
     page_number = metadata.get("page_number")
     page_prefix = f"page_{page_number}__" if page_number is not None else ""
@@ -241,7 +246,7 @@ def chunk_document_parent_child(
     child_chunks = []
 
     for parent_idx, parent_text in enumerate(parent_texts):
-        parent_id = f"{filename}__{page_prefix}parent_{parent_idx}"
+        parent_id = f"{id_namespace}__{page_prefix}parent_{parent_idx}"
 
         # Buat parent chunk
         parent_metadata = {

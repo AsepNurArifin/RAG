@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Trash2, Calendar } from "lucide-react";
+import { FileText, Trash2, Calendar, ExternalLink } from "lucide-react";
 import { api } from "../../lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,15 @@ export function DocumentTable({ refreshTrigger }: { refreshTrigger: number }) {
     }
   };
 
+  const handleOpenFile = async (id: string) => {
+    try {
+      const data = await api.getDocumentFile(id);
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      alert("Gagal membuka file asli. Coba lagi nanti.");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-8 text-center text-slate-400 animate-pulse">
@@ -76,15 +85,28 @@ export function DocumentTable({ refreshTrigger }: { refreshTrigger: number }) {
                     </div>
                   </div>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => handleDelete(doc.id, doc.filename)}
-                  className="text-slate-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 bg-transparent shrink-0"
-                  title="Hapus Dokumen"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {doc.status === "indexed" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenFile(doc.id)}
+                      className="text-slate-400 hover:text-[#0077ff] hover:bg-[#0077ff]/10 h-8 w-8 bg-transparent"
+                      title="Buka File Asli"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleDelete(doc.id, doc.filename)}
+                    className="text-slate-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 bg-transparent shrink-0"
+                    title="Hapus Dokumen"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))
@@ -135,15 +157,28 @@ export function DocumentTable({ refreshTrigger }: { refreshTrigger: number }) {
                       </div>
                     </TableCell>
                     <TableCell className="text-right px-4">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleDelete(doc.id, doc.filename)}
-                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 bg-transparent"
-                        title="Hapus Dokumen"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1 justify-end">
+                        {doc.status === "indexed" && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleOpenFile(doc.id)}
+                            className="text-slate-400 hover:text-[#0077ff] hover:bg-[#0077ff]/10 h-8 w-8 bg-transparent"
+                            title="Buka File Asli"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleDelete(doc.id, doc.filename)}
+                          className="text-slate-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 bg-transparent"
+                          title="Hapus Dokumen"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

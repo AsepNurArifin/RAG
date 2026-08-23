@@ -219,6 +219,8 @@ export function useChatStream(initialSessionId?: string) {
       (error: Error) => {
         if (error.name === "AbortError") {
           console.log("Edit-and-resend cancelled.");
+          setIsLoading(false);
+          setActiveAgent("idle");
           return;
         }
         console.error("Error in editAndResend:", error);
@@ -229,6 +231,7 @@ export function useChatStream(initialSessionId?: string) {
         };
         setMessages((prev) => [...prev, errorMessage]);
         setIsLoading(false);
+        setActiveAgent("idle");
       },
       controller.signal
     );

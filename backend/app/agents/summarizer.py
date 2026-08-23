@@ -9,11 +9,22 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.agents import SUMMARIZER_PROMPT
-from app.agents.utils import format_conversation_history, format_documents_for_prompt
+from app.agents.utils import (
+    format_conversation_history,
+    format_documents_for_prompt,
+    truncate_documents_for_budget,
+    estimate_tokens,
+)
 from app.core.llm_provider import get_llm, invoke_llm_instrumented
 from app.graph.state import GraphState
 
 logger = logging.getLogger(__name__)
+
+# Budget context untuk Summarizer. gpt-oss-120b tier free punya TPM ~8000.
+# System prompt + instruksi + verified claims + output memakan sebagian besar,
+# sehingga context dokumen dibatasi agar total request < limit.
+# 6000 karakter dokumen ≈ 1500 token input; sisanya untuk output & overhead.
+SUMMARIZER_MAX_DOC_CHARS = 6000
 
 
 def _ensure_markdown_table(text: str) -> str:
@@ -81,6 +92,21 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
             "citations": [],
         }
 
+    # Budget control: potong dokumen agar context tidak melebihi TPM provider.
+    # (gpt-oss-120b tier free ~8000 TPM; 413 terjadi saat request > limit.)
+    budgeted_docs = truncate_documents_for_budget(
+        documents,
+        max_total_chars=SUMMARIZER_MAX_DOC_CHARS,
+        per_doc_max_chars=2500,
+    )
+    if len(budgeted_docs) < len(documents):
+        logger.info(
+            "[Summarizer] Context dibatasi: %d/%d dokumen dipakai (~%d chars ≈ %d token)",
+            len(budgeted_docs), len(documents), SUMMARIZER_MAX_DOC_CHARS,
+            estimate_tokens(str(budgeted_docs)),
+        )
+    documents = budgeted_docs
+
     if confidence < 0.1:
         return {
             **state,
@@ -136,6 +162,7 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
             task_type="reasoning",
             max_retries=2,
             usage_meta=usage_meta,
+            deadline=state.get("query_deadline"),
         )
         logger.info("[Summarizer] LLM call selesai, parsing response...")
         response_text = _ensure_markdown_table(response.content)
@@ -188,27 +215,30 @@ def _parse_summarizer_response(
         for doc in source_documents[:5]:
             source_name = _get_doc_field(doc, "source") or _get_doc_field(doc, "filename") or "unknown"
             if source_name.lower() in response_lower:
-                citations.append({
-                    "source": source_name,
-                    "date": _get_doc_field(doc, "date") or _get_doc_field(doc, "upload_date") or "N/A",
-                    "excerpt": _get_doc_field(doc, "content") or "",
-                    "relevance_score": doc.get("relevance_score", 0),
-                })
+                citations.append(_build_citation(doc, source_name))
 
         # Fallback: top-2 most relevant if no explicit citations
         if not citations and source_documents:
             sorted_docs = sorted(source_documents, key=lambda d: d.get("relevance_score", 0), reverse=True)
             citations = [
-                {
-                    "source": _get_doc_field(doc, "source") or _get_doc_field(doc, "filename") or "unknown",
-                    "date": _get_doc_field(doc, "date") or _get_doc_field(doc, "upload_date") or "N/A",
-                    "excerpt": _get_doc_field(doc, "content") or "",
-                    "relevance_score": doc.get("relevance_score", 0),
-                }
+                _build_citation(doc, _get_doc_field(doc, "source") or _get_doc_field(doc, "filename") or "unknown")
                 for doc in sorted_docs[:2]
             ]
 
     return answer, citations
+
+
+def _build_citation(doc: dict, source_name: str) -> dict:
+    """Bangun dict citasi lengkap dengan document_id untuk lookup file asli (MinIO)."""
+    return {
+        "source": source_name,
+        "date": _get_doc_field(doc, "date") or _get_doc_field(doc, "upload_date") or "N/A",
+        "excerpt": _get_doc_field(doc, "content") or "",
+        "relevance_score": doc.get("relevance_score", 0),
+        "document_id": doc.get("document_id")
+        or _get_doc_field(doc, "document_id")
+        or "",
+    }
 
 
 def _get_doc_field(doc: dict, field: str) -> str | None:

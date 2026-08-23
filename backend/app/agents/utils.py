@@ -40,6 +40,72 @@ def format_documents_for_prompt(
     return "\n".join(parts)
 
 
+def estimate_tokens(text: str) -> int:
+    """
+    Estimasi token dari teks (heuristik: 4 karakter ≈ 1 token).
+    Cukup akurat untuk budgeting prompt agar tidak melebihi TPM provider.
+    """
+    if not text:
+        return 0
+    # Bahasa campuran: angka aman ~4 char/token. Jangan terlalu presisi.
+    return max(1, int(len(text) / 4))
+
+
+def truncate_documents_for_budget(
+    documents: list[dict],
+    max_total_chars: int,
+    per_doc_max_chars: int = 2500,
+) -> list[dict]:
+    """
+    Potong daftar dokumen agar total context muat dalam budget karakter.
+
+    Strategi:
+    1. Sort berdasarkan relevance_score (dokumen paling relevan dipertahankan).
+    2. Potong content per dokumen ke per_doc_max_chars.
+    3. Drop dokumen paling tidak relevan hingga total muat dalam max_total_chars.
+
+    Returns:
+        List dokumen baru (copy) yang sudah dibatasi.
+    """
+    if not documents:
+        return []
+
+    ordered = sorted(
+        documents,
+        key=lambda d: d.get("reranker_score", d.get("relevance_score", 0)),
+        reverse=True,
+    )
+
+    result = []
+    used = 0
+    for doc in ordered:
+        content = _get_field(doc, "content") or ""
+        content = content[:per_doc_max_chars]
+        doc_meta = doc.get("metadata", {}) if isinstance(doc.get("metadata"), dict) else {}
+
+        if used + len(content) > max_total_chars:
+            break
+
+        # Copy doc + truncate content + simpan metadata
+        new_doc = dict(doc)
+        new_doc["content"] = content
+        new_doc["metadata"] = dict(doc_meta)
+        result.append(new_doc)
+        used += len(content)
+
+    logger = _get_logger()
+    logger.info(
+        "[Budget] Dokumen dibatasi: %d/%d dipakai, ~%d chars (~%d token)",
+        len(result), len(documents), used, estimate_tokens(str(result[:1])) if result else 0,
+    )
+    return result
+
+
+def _get_logger():
+    import logging
+    return logging.getLogger(__name__)
+
+
 def _get_field(doc: dict, field: str) -> str | None:
     """Get field from doc dict, checking both top-level and nested metadata."""
     value = doc.get(field)

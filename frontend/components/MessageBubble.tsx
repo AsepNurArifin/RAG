@@ -141,12 +141,16 @@ export function MessageBubble({ message, onEdit, isLoading }: MessageBubbleProps
   }
 
   // AI Response
-  const confidenceScore = message.confidenceScore !== undefined ? Math.round(message.confidenceScore * 100) : 98;
+  const confidenceScore = message.confidenceScore;
+  const hasConfidence = confidenceScore !== undefined && confidenceScore !== null && !Number.isNaN(confidenceScore);
+  const displayConfidence = hasConfidence ? Math.round(confidenceScore * 100) : null;
   const radius = 20;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = mounted ? circumference - (confidenceScore / 100) * circumference : circumference;
+  const strokeDashoffset = mounted && displayConfidence !== null ? circumference - (displayConfidence / 100) * circumference : circumference;
 
-  const confColor = confidenceScore >= 70 ? "#10b981" : confidenceScore >= 40 ? "#f59e0b" : "#dc2626";
+  const confColor = displayConfidence === null
+    ? "#94a3b8"
+    : displayConfidence >= 70 ? "#10b981" : displayConfidence >= 40 ? "#f59e0b" : "#dc2626";
 
   return (
     <motion.div
@@ -193,7 +197,9 @@ export function MessageBubble({ message, onEdit, isLoading }: MessageBubbleProps
                     />
                   </svg>
                 </div>
-                <span className="text-xs font-bold text-slate-700">{confidenceScore}%</span>
+                <span className="text-xs font-bold text-slate-700">
+                  {displayConfidence !== null ? `${displayConfidence}%` : "N/A"}
+                </span>
               </div>
             </div>
 
