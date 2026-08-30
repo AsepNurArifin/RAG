@@ -36,14 +36,15 @@ RUN apt-get update \
 RUN useradd -m -r appuser
 
 # Salin virtual environment (.venv) yang sudah matang dari stage builder
-COPY --from=builder /app/.venv /app/.venv
+COPY --chown=appuser:appuser --from=builder /app/.venv /app/.venv
 
 # Salin kode aplikasi kamu
 COPY --chown=appuser:appuser . .
 
 # Siapkan folder untuk model cache dan uploads dengan permission yang benar
 RUN mkdir -p /app/uploads /app/model_cache \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app/uploads /app/model_cache
+
 
 # Daftarkan path virtual environment ke PATH sistem agar binary uvicorn langsung terbaca
 ENV PATH="/app/.venv/bin:$PATH"

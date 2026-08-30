@@ -14,6 +14,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: enterprisemind_backend:latest
     container_name: enterprisemind_backend
     restart: unless-stopped
     environment:
@@ -54,12 +55,11 @@ services:
       - enterprisemind_net
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: enterprisemind_backend:latest
     container_name: enterprisemind_worker
     restart: unless-stopped
     command: ["python", "-m", "app.temporal.worker"]
+
     environment:
       APP_ENV: production
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib di-set}@postgres-app:5432/enterprisemind
@@ -75,12 +75,15 @@ services:
     volumes:
       - model_cache:/app/model_cache
     depends_on:
+      backend:
+        condition: service_started
       postgres-app:
         condition: service_healthy
       milvus:
         condition: service_healthy
       temporal:
         condition: service_started
+
     networks:
       - enterprisemind_net
 
