@@ -1,4 +1,5 @@
-import { QueryResponse, Document, Session, Metrics, UserData, Message, UploadResponse, WorkflowStatusResponse } from "../types";
+import { QueryResponse, Document, Session, Metrics, UserData, UploadResponse, WorkflowStatusResponse } from "../types";
+import type { HistoryMessageResponse } from "../hooks/useChatStream";
 
 // Base URL for the backend API.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -83,48 +84,71 @@ export const api = {
       const decoder = new TextDecoder();
       let buffer = "";
       let receivedResult = false;
+      // Log event SSE hanya di development — jangan bocorkan payload di production.
+      const debugStream = process.env.NODE_ENV !== "production";
+
+      const parseBlock = (block: string) => {
+        const trimmed = block.trim();
+        // Dukung "data:..." (SSE) dan multiple data: lines.
+        if (trimmed.startsWith("data:")) {
+          for (const line of trimmed.split("\n")) {
+            const clean = line.trim();
+            if (clean && clean.startsWith("data:")) {
+              const dataStr = clean.substring(5).trim();
+              if (!dataStr) continue;
+              try {
+                const data = JSON.parse(dataStr);
+                if (debugStream) console.debug("[SSE]", data.type, data.agent ?? "");
+                if (data.type === "agent" && typeof data.agent === "string") {
+                  // Hanya "started" yang menggerakkan indikator aktif;
+                  // tanpa status (backend lama) diperlakukan sebagai started.
+                  if (!data.status || data.status === "started") {
+                    onAgentUpdate(data.agent);
+                  }
+                } else if (data.type === "result") {
+                  receivedResult = true;
+                  onResult(data);
+                } else if (data.type === "error") {
+                  receivedResult = true;
+                  onError(new Error(data.message || "Terjadi kesalahan sistem."));
+                }
+                // "heartbeat" diabaikan — hanya keepalive.
+                // "cancelled" diabaikan — user/Langfuse membatalkan, bukan transport failure.
+              } catch (e) {
+                console.error("Parse error:", e);
+              }
+            }
+          }
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-
-        const parts = buffer.split("\n\n");
+        // Normalisasi CRLF dan pecah per event.
+        const normalized = buffer.replace(/\r\n/g, "\n");
+        const parts = normalized.split("\n\n");
         buffer = parts.pop() || ""; // Keep the incomplete part
 
         for (const part of parts) {
-          // Handle both "data: ..." and possible leading whitespace/newlines.
-          const trimmed = part.trim();
-          if (!trimmed.startsWith("data:")) continue;
-
-          const dataStr = trimmed.substring(5).trim();
-          if (!dataStr) continue;
-
-          try {
-            const data = JSON.parse(dataStr);
-            if (data.type === "agent") {
-              onAgentUpdate(data.agent);
-            } else if (data.type === "result") {
-              receivedResult = true;
-              onResult(data);
-            } else if (data.type === "error") {
-              receivedResult = true;
-              onError(new Error(data.message || "Terjadi kesalahan sistem."));
-            }
-            // "heartbeat" diabaikan — hanya keepalive agar koneksi tidak terputus.
-          } catch (e) {
-            console.error("Parse error:", e);
-          }
+          parseBlock(part);
         }
+      }
+
+      // Flush sisa byte multibyte + buffer yang belum terminasi blank line ganda.
+      buffer += decoder.decode();
+      if (buffer.trim()) {
+        parseBlock(buffer);
       }
 
       // Stream ended without a result or error event — backend likely crashed
       if (!receivedResult) {
         onError(new Error("Koneksi ke server terputus. Silakan coba lagi."));
       }
-    } catch (e: any) {
-      onError(e);
+    } catch (e) {
+      onError(e instanceof Error ? e : new Error(String(e)));
     }
   },
 
@@ -208,7 +232,7 @@ export const api = {
     return response.json();
   },
 
-  async getSessionMessages(sessionId: string): Promise<Message[]> {
+  async getSessionMessages(sessionId: string): Promise<HistoryMessageResponse[]> {
     const response = await authFetch(`${API_BASE_URL}/sessions/${sessionId}/messages`);
     if (!response.ok) throw new Error("Failed to fetch messages");
     return response.json();

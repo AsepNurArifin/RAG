@@ -18,6 +18,7 @@ from slowapi.util import get_remote_address
 
 from app.core.config import settings
 from app.core.auth import get_current_user, get_user_rbac_filter
+from app.core import observability
 from app.db import log_query, save_message
 from app.db.messages import get_or_create_user_conversation, get_messages_for_session
 from app.graph.build_graph import build_agent_graph
@@ -29,6 +30,19 @@ limiter = Limiter(key_func=get_remote_address)
 
 _agent_graph = None
 
+# Pesan error aman untuk user — detail teknis hanya ke log/Langfuse.
+_SAFE_ERROR_MESSAGES = {
+    "QUERY_TIMEOUT": ("Pemrosesan memakan waktu terlalu lama. Silakan coba lagi.", False),
+    "LLM_FAILURE": ("Sistem sedang mengalami kendala saat memproses jawaban. Silakan coba lagi.", True),
+    "SESSION_OWNERSHIP": ("Session ini milik user lain. Buat session baru.", False),
+    "SERVER_ERROR": ("Terjadi kesalahan sistem. Silakan coba lagi.", True),
+}
+
+
+def _safe_error(code: str, detail: str) -> dict:
+    message, retryable = _SAFE_ERROR_MESSAGES.get(code, _SAFE_ERROR_MESSAGES["SERVER_ERROR"])
+    return {"type": "error", "code": code, "message": message, "retryable": retryable, "detail": detail[:200]}
+
 
 def _get_graph():
     """Lazy init — build once, reuse."""
@@ -36,6 +50,31 @@ def _get_graph():
     if _agent_graph is None:
         _agent_graph = build_agent_graph()
     return _agent_graph
+
+
+# Nama node graph yang dilaporkan ke frontend sebagai tracking agent.
+# "tools" dan "reflection" dipetakan ulang di frontend (AGENT_ALIASES).
+GRAPH_NODE_NAMES = frozenset(
+    {"orchestrator", "tools", "researcher", "verifier", "summarizer", "executor", "reflection"}
+)
+
+
+def _lifecycle_node_name(event: dict) -> str | None:
+    """Ambil nama node graph dari satu event ``astream_events`` bila event ini
+    adalah start/end LEVEL NODE — bukan sub-chain/LLM di dalam node.
+
+    Event level node memiliki tepat satu parent (root graph run) pada
+    langchain-core >= 0.3 (attr ``parent_ids`` tersedia). Fallback untuk core
+    lama: cocokkan ``metadata.langgraph_node`` dengan nama event.
+    """
+    name = event.get("name")
+    if name not in GRAPH_NODE_NAMES:
+        return None
+    parents = event.get("parent_ids")
+    if parents is not None:
+        return name if len(parents) <= 1 else None
+    metadata = event.get("metadata") or {}
+    return name if metadata.get("langgraph_node") == name else None
 
 
 class QueryRequest(BaseModel):
@@ -64,6 +103,17 @@ async def process_query(
     """Process query through agent graph. Returns SSE stream. RBAC-aware."""
     async def event_generator():
         start_time = time.time()
+        request_id = str(uuid.uuid4())
+        current_state: dict = {"status": "failed", "confidence_score": 0.0, "reflection_count": 0}
+
+        # Langfuse: satu root trace per query. Optional — no-op jika disabled.
+        trace = observability.start_query_trace({
+            "request_id": request_id,
+            "session_id": body.session_id,
+            "environment": settings.APP_ENV,
+            "query_length": len(body.query),
+        })
+        trace_token = observability.set_active_trace(trace)
 
         try:
             graph = _get_graph()
@@ -107,6 +157,11 @@ async def process_query(
                 "user_department": user.get("department", "") or "",
                 "user_clearance_level": user.get("clearance_level", 1) or 1,
                 "rbac_filter": rbac_filter,
+                "request_id": request_id,
+                "trace_id": trace.id if trace is not None else None,
+                "langfuse_trace": trace,
+                "status": "completed",
+                "error_code": None,
                 "intent": "",
                 "intent_type": "",
                 "intent_confidence": 0.0,
@@ -121,10 +176,10 @@ async def process_query(
                 "reflection_count": 0,
                 "final_answer": "",
                 "citations": [],
+                "follow_up_suggestions": [],
                 "action_items": [],
                 "conversation_history": conversation_history,
                 "llm_usage": {},
-                "trace_id": None,
                 "tool_results": [],
                 "error": None,
                 "query_deadline": time.time() + settings.QUERY_TIMEOUT_SECONDS,
@@ -138,13 +193,26 @@ async def process_query(
             async def run_graph():
                 try:
                     node_count = 0
-                    async for output in graph.astream(initial_state):
-                        node_count += 1
-                        for node_name, state_update in output.items():
-                            logger.info("[Query] graph.astream yielded node #%d: %s", node_count, node_name)
-                            current_state.update(state_update)
-                            await queue.put({"type": "agent", "agent": node_name})
-                    logger.info("[Query] graph.astream completed. Total nodes: %d", node_count)
+                    # astream_events (v2): event lifecycle per node. Event
+                    # "on_chain_start" level node dikirim SAAT node MULAI
+                    # berjalan, sehingga indikator pipeline di frontend
+                    # berpindah real-time (astream() biasa baru mengirim
+                    # setelah node selesai).
+                    async for event in graph.astream_events(initial_state, version="v2"):
+                        etype = event.get("event")
+                        if etype == "on_chain_start":
+                            node_name = _lifecycle_node_name(event)
+                            if node_name:
+                                node_count += 1
+                                logger.info("[Query] Node mulai #%d: %s", node_count, node_name)
+                                await queue.put({"type": "agent", "agent": node_name, "status": "started"})
+                        elif etype == "on_chain_end":
+                            node_name = _lifecycle_node_name(event)
+                            if node_name:
+                                output = (event.get("data") or {}).get("output")
+                                if isinstance(output, dict):
+                                    current_state.update(output)
+                    logger.info("[Query] graph.astream_events completed. Total nodes: %d", node_count)
                     await queue.put({"type": "done"})
                 except asyncio.CancelledError:
                     logger.info("[Query] Graph execution cancelled by client disconnect.")
@@ -194,6 +262,13 @@ async def process_query(
                 logger.info("[Query] Skipping DB save — query was cancelled.")
                 return
 
+            # Tentukan status akhir: degraded jika ada error/fallback, selain itu completed.
+            status = "completed"
+            error_code = current_state.get("error_code")
+            if current_state.get("error"):
+                status = "degraded" if current_state.get("final_answer") else "failed"
+                error_code = error_code or "LLM_FAILURE"
+
             # Log query
             try:
                 usage = current_state.get("llm_usage", {}) or {}
@@ -208,6 +283,11 @@ async def process_query(
                     output_tokens=usage.get("output_tokens", 0),
                     total_tokens=usage.get("total_tokens", 0),
                     usage_details=usage,
+                    request_id=request_id,
+                    trace_id=current_state.get("trace_id"),
+                    status=status,
+                    session_id=body.session_id,
+                    user_id=user_id,
                 )
             except Exception as e:
                 logger.warning("Gagal log query: %s", e)
@@ -229,13 +309,24 @@ async def process_query(
                         conversation_id = str(conv["id"])
 
                 if conversation_id:
-                    await save_message(conversation_id=conversation_id, role="user", content=body.query)
+                    await save_message(
+                        conversation_id=conversation_id, role="user", content=body.query,
+                        request_id=request_id,
+                    )
                     await save_message(
                         conversation_id=conversation_id, role="assistant",
                         content=current_state.get("final_answer", ""),
                         citations=current_state.get("citations", []),
                         confidence_score=current_state.get("confidence_score", 0),
                         action_items=current_state.get("action_items", []),
+                        follow_up_suggestions=current_state.get("follow_up_suggestions", []),
+                        intent=current_state.get("intent", ""),
+                        intent_type=current_state.get("intent_type", ""),
+                        reflection_count=current_state.get("reflection_count", 0),
+                        request_id=request_id,
+                        trace_id=current_state.get("trace_id"),
+                        status=status,
+                        error_code=error_code,
                         latency_ms=elapsed_ms, model_used=settings.GROQ_MODEL_REASONING,
                     )
             except Exception as e:
@@ -244,18 +335,45 @@ async def process_query(
             final_answer = current_state.get("final_answer") or "Maaf, gagal memproses pertanyaan."
             final_response = {
                 "type": "result", "answer": final_answer,
+                "status": status,
                 "citations": current_state.get("citations", []),
                 "action_items": current_state.get("action_items", []),
                 "confidence_score": current_state.get("confidence_score", 0),
                 "intent": current_state.get("intent", ""),
+                "intent_type": current_state.get("intent_type", ""),
                 "reflection_count": current_state.get("reflection_count", 0),
                 "latency_ms": elapsed_ms, "session_id": body.session_id,
+                "follow_up_suggestions": current_state.get("follow_up_suggestions", []),
+                "request_id": request_id,
+                "trace_id": current_state.get("trace_id"),
             }
             yield f"data: {json.dumps(final_response)}\n\n"
 
+        except asyncio.CancelledError:
+            logger.info("[Query] Generator dibatalkan (disconnect).")
+            raise
+        except HTTPException as e:
+            # Ownership/validasi — pesan aman, kode stabil.
+            code = "SESSION_OWNERSHIP" if e.status_code == 403 else "SERVER_ERROR"
+            yield f"data: {json.dumps(_safe_error(code, str(e.detail)))}\n\n"
         except Exception as e:
             logger.exception("[Query API] Error: %s", e)
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            payload = _safe_error("SERVER_ERROR", str(e))
+            yield f"data: {json.dumps(payload)}\n\n"
+        finally:
+            # Langfuse: tutup trace + flush. Kegagalan observability tidak boleh
+            # memengaruhi respons user.
+            observability.end_query_trace(
+                trace,
+                output={"request_id": request_id, "status": current_state.get("status", "completed") if "current_state" in dir() else "failed"},
+                meta={
+                    "latency_ms": int((time.time() - start_time) * 1000),
+                    "confidence_score": current_state.get("confidence_score", 0) if "current_state" in dir() else 0,
+                    "reflection_count": current_state.get("reflection_count", 0) if "current_state" in dir() else 0,
+                },
+            )
+            observability.flush()
+            observability.reset_active_trace(trace_token)
 
     return StreamingResponse(
         event_generator(), media_type="text/event-stream",

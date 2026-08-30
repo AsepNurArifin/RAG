@@ -21,14 +21,20 @@ async def log_query(
     output_tokens: int = 0,
     total_tokens: int = 0,
     usage_details: dict | None = None,
+    request_id: str | None = None,
+    trace_id: str | None = None,
+    status: str = "completed",
+    session_id: str | None = None,
+    user_id: str | None = None,
 ) -> dict[str, Any]:
-    """Log query untuk dashboard metrics."""
+    """Log query untuk dashboard metrics + audit trail."""
     sql = """
         INSERT INTO query_logs (query, intent, agents_activated, latency_ms,
                                 confidence_score, reflection_count, model_used,
                                 estimated_cost_usd, input_tokens, output_tokens,
-                                total_tokens, usage_details)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                total_tokens, usage_details,
+                                request_id, trace_id, status, session_id, user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         RETURNING id, query, intent, created_at
     """
     result = await fetch_one(
@@ -45,5 +51,10 @@ async def log_query(
         output_tokens,
         total_tokens,
         json.dumps(usage_details or {}),
+        request_id,
+        trace_id,
+        status,
+        session_id,
+        user_id,
     )
     return result

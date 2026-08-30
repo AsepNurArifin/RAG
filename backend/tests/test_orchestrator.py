@@ -91,3 +91,25 @@ def test_intent_map_complete():
     ]
     for raw in raw_intents:
         assert raw in INTENT_MAP, f"Intent '{raw}' belum ter-mapping"
+
+
+def test_definition_query_is_comprehensive():
+    """'Apa itu X?' diklasifikasikan comprehensive (jawaban mendalam), bukan factual."""
+    intent, conf = classify_intent("Apa itu HAM?")
+    assert intent == "comprehensive"
+    assert conf >= 0.8
+
+
+def test_definition_query_orchestrates_informational_with_researcher():
+    """Definition query tetap menuju researcher (bukan out_of_scope)."""
+    state = _make_state("Apa itu HAM?")
+    new_state = run_orchestrator_agent(state)
+    assert new_state["intent"] == "informational"
+    assert "researcher" in new_state["agents_to_activate"]
+
+
+def test_factual_query_remains_factual():
+    """Query fakta singkat tanpa 'apa itu' tetap factual."""
+    intent, conf = classify_intent("Berapa hari cuti tahunan?")
+    assert intent == "factual"
+    assert 0.0 <= conf <= 1.0

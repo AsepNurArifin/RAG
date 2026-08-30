@@ -20,20 +20,32 @@ export interface Message {
   actionItems?: ActionItem[];
   confidenceScore?: number;
   intent?: string;
+  intentType?: string;
   reflectionCount?: number;
   latencyMs?: number;
   isStreaming?: boolean;
+  followUpSuggestions?: string[];
+  requestId?: string;
+  traceId?: string;
+  status?: 'completed' | 'degraded' | 'failed';
+  errorCode?: string;
 }
 
 export interface QueryResponse {
+  type?: 'result';
   answer: string;
+  status?: 'completed' | 'degraded' | 'failed';
   citations: Citation[];
   action_items: ActionItem[];
+  follow_up_suggestions: string[];
   confidence_score: number;
   intent: string;
+  intent_type?: string;
   reflection_count: number;
   latency_ms: number;
   session_id: string;
+  request_id: string;
+  trace_id?: string | null;
 }
 
 export interface Document {

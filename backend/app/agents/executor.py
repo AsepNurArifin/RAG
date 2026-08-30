@@ -43,8 +43,6 @@ def run_executor_agent(state: GraphState) -> GraphState:
     """
     query = state.get("query", "")
     final_answer = state.get("final_answer", "")
-    documents = state.get("retrieved_documents", [])
-    session_id = state.get("session_id", "")
 
     logger.info("[Executor] Generating action items untuk: '%s...'", query[:80])
 
@@ -64,7 +62,8 @@ def run_executor_agent(state: GraphState) -> GraphState:
     llm = get_llm("fast")
 
     chain = prompt | llm
-    response, _ = invoke_llm_instrumented(
+    usage_meta = dict(state.get("llm_usage", {}) or {})
+    response, usage_meta = invoke_llm_instrumented(
         chain=chain,
         input_data={
             "query": query,
@@ -73,6 +72,8 @@ def run_executor_agent(state: GraphState) -> GraphState:
         agent_name="executor",
         task_type="fast",
         max_retries=2,
+        usage_meta=usage_meta,
+        deadline=state.get("query_deadline"),
     )
 
     # Parse response
@@ -97,6 +98,7 @@ def run_executor_agent(state: GraphState) -> GraphState:
     return {
         **state,
         "action_items": action_items,
+        "llm_usage": usage_meta,
     }
 
 

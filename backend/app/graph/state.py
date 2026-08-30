@@ -15,9 +15,7 @@ Usage:
     }
 """
 
-from typing import Annotated, TypedDict
-
-from langgraph.graph.message import add_messages
+from typing import Any, TypedDict
 
 
 class GraphState(TypedDict):
@@ -95,6 +93,24 @@ class GraphState(TypedDict):
     citations: list[dict]
     """Daftar sitasi sumber.
     Format: [{source, date, excerpt, chunk_index}]"""
+
+    follow_up_suggestions: list[str]
+    """Saran pertanyaan lanjutan untuk membantu user non-IT menindaklanjuti jawaban."""
+
+    # ------------------------------------------------------------------ #
+    # Request Context (observability & audit)
+    # ------------------------------------------------------------------ #
+    request_id: str
+    """ID unik per request (korelasi log DB, SSE, dan Langfuse)."""
+
+    status: str
+    """Status akhir query: completed / degraded / failed."""
+
+    error_code: str | None
+    """Kode error stabil (mis. QUERY_TIMEOUT, LLM_FAILURE). None jika sukses."""
+
+    langfuse_trace: Any
+    """Objek trace Langfuse aktif (in-memory saja, tidak di-persist)."""
 
     # ------------------------------------------------------------------ #
     # Executor Output

@@ -9,6 +9,8 @@ WORKDIR /app
 # Mengoptimalkan cache Docker layer
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
+ENV UV_NO_CACHE=1
+
 
 # Pindahkan file pengunci dependency terlebih dahulu
 COPY pyproject.toml uv.lock ./

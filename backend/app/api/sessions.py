@@ -48,31 +48,29 @@ async def get_session_messages(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesi tidak ditemukan.")
 
     import json
-    # Ambil semua pesan
+    # Ambil semua pesan — kontrak identik dengan live response agar
+    # history dan pesan baru memiliki shape yang sama.
     query = """
-        SELECT id, role, content, citations, confidence_score, action_items, latency_ms, created_at
+        SELECT id, role, content, citations, confidence_score, action_items,
+               follow_up_suggestions, intent, intent_type, reflection_count,
+               request_id, trace_id, status, error_code, latency_ms,
+               model_used, created_at
         FROM messages
         WHERE conversation_id = $1
         ORDER BY created_at ASC
     """
     rows = await fetch_all(query, str(conv["id"]))
-    
+
     # asyncpg mengembalikan JSONB sebagai string, jadi kita perlu parse ke dict/list Python
     for row in rows:
-        if isinstance(row.get("citations"), str):
-            try:
-                row["citations"] = json.loads(row["citations"])
-            except Exception as e:
-                logger.warning("Gagal parse citations JSONB (id=%s): %s", row.get("id"), e)
-                row["citations"] = []
-                
-        if isinstance(row.get("action_items"), str):
-            try:
-                row["action_items"] = json.loads(row["action_items"])
-            except Exception as e:
-                logger.warning("Gagal parse action_items JSONB (id=%s): %s", row.get("id"), e)
-                row["action_items"] = []
-                
+        for field in ("citations", "action_items", "follow_up_suggestions"):
+            if isinstance(row.get(field), str):
+                try:
+                    row[field] = json.loads(row[field])
+                except Exception as e:
+                    logger.warning("Gagal parse %s JSONB (id=%s): %s", field, row.get("id"), e)
+                    row[field] = []
+
     return rows
 
 

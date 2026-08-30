@@ -50,6 +50,14 @@ CREATE TABLE IF NOT EXISTS messages (
     citations JSONB DEFAULT '[]'::jsonb,
     confidence_score FLOAT,
     action_items JSONB DEFAULT '[]'::jsonb,
+    follow_up_suggestions JSONB DEFAULT '[]'::jsonb,
+    intent VARCHAR(100),
+    intent_type VARCHAR(100),
+    reflection_count INTEGER DEFAULT 0,
+    request_id TEXT,
+    trace_id TEXT,
+    status VARCHAR(20) DEFAULT 'completed',
+    error_code TEXT,
     latency_ms INTEGER,
     model_used VARCHAR(100),
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -66,6 +74,15 @@ CREATE TABLE IF NOT EXISTS query_logs (
     reflection_count INTEGER DEFAULT 0,
     model_used VARCHAR(100),
     estimated_cost_usd FLOAT DEFAULT 0,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    usage_details JSONB DEFAULT '{}'::jsonb,
+    request_id TEXT,
+    trace_id TEXT,
+    status VARCHAR(20) DEFAULT 'completed',
+    session_id TEXT,
+    user_id UUID REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

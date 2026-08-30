@@ -132,6 +132,7 @@ export function ChatWindow({ onSessionChange, externalSessionId }: ChatWindowPro
                   message={msg}
                   onEdit={msg.role === "user" ? editAndResend : undefined}
                   isLoading={isLoading}
+                  onSendSuggestion={sendMessage}
                 />
               ))}
               {isLoading && <LoadingIndicator />}

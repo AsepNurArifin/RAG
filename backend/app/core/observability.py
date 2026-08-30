@@ -13,6 +13,7 @@ Prinsip:
 
 import logging
 import time
+from contextvars import ContextVar
 from typing import Any
 
 from app.core.config import settings
@@ -21,6 +22,28 @@ logger = logging.getLogger(__name__)
 
 _trace_id_counter = 0
 _usage_by_request: dict[str, dict] = {}
+
+# Trace aktif per-request (async-safe). Di-set di API boundary sehingga SEMUA
+# invoke_llm_instrumented() otomatis menempel ke trace query yang benar
+# tanpa perlu mengubah signature setiap agent.
+_active_trace: ContextVar[Any] = ContextVar("emind_langfuse_trace", default=None)
+
+
+def set_active_trace(trace) -> Any:
+    """Set trace aktif untuk context ini. Kembalikan token untuk reset."""
+    return _active_trace.set(trace)
+
+
+def get_active_trace():
+    """Ambil trace aktif (None jika tidak ada / Langfuse disabled)."""
+    return _active_trace.get()
+
+
+def reset_active_trace(token) -> None:
+    try:
+        _active_trace.reset(token)
+    except Exception:
+        pass
 
 
 def _trace_id() -> str:
@@ -103,6 +126,18 @@ def start_query_trace(meta: dict | None = None):
     """Mulai trace untuk satu query."""
     observability = get_observability_client()
     return _start_trace_if_enabled(observability, "query", meta)
+
+
+def end_query_trace(trace, output: Any = None, meta: dict | None = None) -> None:
+    """Akhiri trace query. Never raises."""
+    if trace is None:
+        return
+    observability = get_observability_client()
+    if observability.enabled:
+        try:
+            trace.update(output=output, metadata=meta or None)
+        except Exception as e:
+            logger.warning("LangFuse trace end gagal: %s", e)
 
 
 def start_generation(trace, name: str, meta: dict | None = None):

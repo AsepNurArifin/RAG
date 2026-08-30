@@ -22,7 +22,9 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0",
     "python-multipart==0.0.9",
     "sentence-transformers==3.0.1",
+    "torch",
     "Sastrawi>=1.0.1",
+
     "slowapi==0.1.9",
     "temporalio>=1.8.0",
     "tenacity==9.1.4",
@@ -46,3 +48,12 @@ dev = [
     "ragas==0.2.13",
     "ruff==0.9.6",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+

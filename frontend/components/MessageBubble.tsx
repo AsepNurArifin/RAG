@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Message } from "../types";
 import { CitationCard } from "./CitationCard";
-import { User, ShieldCheck, Zap, Bot, Pencil } from "lucide-react";
+import { User, ShieldCheck, Zap, Bot, Pencil, AlertTriangle } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
@@ -16,9 +16,10 @@ interface MessageBubbleProps {
   message: Message;
   onEdit?: (messageId: string, newContent: string) => void;
   isLoading?: boolean;
+  onSendSuggestion?: (text: string) => void;
 }
 
-export function MessageBubble({ message, onEdit, isLoading }: MessageBubbleProps) {
+export function MessageBubble({ message, onEdit, isLoading, onSendSuggestion }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [mounted, setMounted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -152,6 +153,33 @@ export function MessageBubble({ message, onEdit, isLoading }: MessageBubbleProps
     ? "#94a3b8"
     : displayConfidence >= 70 ? "#10b981" : displayConfidence >= 40 ? "#f59e0b" : "#dc2626";
 
+  // Role system = pesan error/status sistem → render beda dari jawaban AI.
+  if (message.role === "system") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="w-full mb-8"
+      >
+        <div className="flex gap-4 max-w-[90%] items-start">
+          <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-500 mt-1">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <Card className="flex-1 border-red-200 bg-red-50/40 shadow-sm overflow-hidden">
+            <CardContent className="p-4 sm:p-6">
+              <p className="text-sm font-semibold text-red-700 mb-1">Gagal memproses permintaan</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{message.content}</p>
+              {message.requestId && (
+                <p className="text-[11px] text-slate-400 mt-3 font-mono">request: {message.requestId}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -175,6 +203,16 @@ export function MessageBubble({ message, onEdit, isLoading }: MessageBubbleProps
                 <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Verified Response
                 </span>
+                {message.status === "degraded" && (
+                  <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">
+                    Parsial
+                  </Badge>
+                )}
+                {message.status === "failed" && (
+                  <Badge variant="secondary" className="text-[10px] bg-red-100 text-red-700 border-red-200">
+                    Gagal
+                  </Badge>
+                )}
               </div>
 
               {/* Confidence Dial */}
@@ -263,6 +301,32 @@ export function MessageBubble({ message, onEdit, isLoading }: MessageBubbleProps
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {message.citations.map((citation, index) => (
                   <CitationCard key={index} citation={citation} index={index} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Follow-up Suggestions — bantu user non-IT menindaklanjuti tanpa menyusun prompt */}
+          {Array.isArray(message.followUpSuggestions) && message.followUpSuggestions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85 }}
+              className="mt-4 pl-2"
+            >
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
+                Lanjut bertanya
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {message.followUpSuggestions.map((suggestion, i) => (
+                  <button
+                    key={i}
+                    onClick={() => onSendSuggestion?.(suggestion)}
+                    disabled={isLoading}
+                    className="px-3 py-1.5 text-xs font-medium text-[#0077ff] bg-[#0077ff]/5 border border-[#0077ff]/20 rounded-full hover:bg-[#0077ff]/10 hover:border-[#0077ff]/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {suggestion}
+                  </button>
                 ))}
               </div>
             </motion.div>

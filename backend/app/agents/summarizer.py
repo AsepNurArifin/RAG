@@ -5,6 +5,7 @@ Synthesize final answer from verified documents with citations.
 """
 import json
 import logging
+import re
 
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -71,9 +72,7 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
     documents = state.get("retrieved_documents", [])
     verified_claims = state.get("verified_claims", [])
     confidence = state.get("confidence_score", 0.0)
-    flagged_issues = state.get("flagged_issues", [])
     intent = state.get("intent_type") or state.get("intent", "informational")
-    session_id = state.get("session_id", "")
     conversation_history = state.get("conversation_history", [])
 
     logger.info("[Summarizer] Menyusun jawaban: confidence=%.2f, docs=%d", confidence, len(documents))
@@ -83,6 +82,11 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
             **state,
             "final_answer": "Maaf, pertanyaan ini berada di luar cakupan knowledge base yang tersedia. Saya hanya dapat menjawab pertanyaan yang berkaitan dengan dokumen internal yang telah diindeks.",
             "citations": [],
+            "follow_up_suggestions": [
+                "Persempit pertanyaan ke topik dokumen internal",
+                "Sebutkan nama dokumen atau kebijakan yang dimaksud",
+                "Tanyakan istilah yang belum jelas",
+            ],
         }
 
     if not documents:
@@ -90,6 +94,11 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
             **state,
             "final_answer": "Maaf, saya tidak menemukan dokumen yang relevan untuk menjawab pertanyaan Anda. Pastikan dokumen terkait sudah diupload dan diindeks dalam sistem.",
             "citations": [],
+            "follow_up_suggestions": [
+                "Coba kata kunci yang berbeda",
+                "Sebutkan nama dokumen atau departemen terkait",
+                "Periksa apakah dokumen sudah diupload admin",
+            ],
         }
 
     # Budget control: potong dokumen agar context tidak melebihi TPM provider.
@@ -112,6 +121,11 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
             **state,
             "final_answer": "Berdasarkan pencarian yang dilakukan, saya tidak menemukan informasi yang cukup relevan untuk menjawab pertanyaan Anda tentang ini. Kemungkinan dokumen terkait belum tersedia di dalam knowledge base. Silakan coba dengan pertanyaan yang lebih spesifik atau hubungi admin untuk menambah dokumen.",
             "citations": [],
+            "follow_up_suggestions": [
+                "Tulis pertanyaan dengan kata kunci lebih spesifik",
+                "Sebutkan judul dokumen atau nomor kebijakan",
+                "Hubungi admin untuk menambahkan dokumen terkait",
+            ],
         }
 
     try:
@@ -165,6 +179,11 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
             deadline=state.get("query_deadline"),
         )
         logger.info("[Summarizer] LLM call selesai, parsing response...")
+        logger.info(
+            "[Summarizer] Raw response: %d karakter, marker SITASI di posisi %s",
+            len(response.content),
+            response.content.find("SITASI:"),
+        )
         response_text = _ensure_markdown_table(response.content)
         answer, citations = _parse_summarizer_response(response_text, documents)
 
@@ -176,13 +195,17 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
         logger.exception("[Summarizer] ERROR unhandled exception: %s", e)
         return {
             **state,
-            "final_answer": f"Maaf, terjadi kesalahan internal saat menyusun jawaban: {str(e)}",
+            "final_answer": "Maaf, terjadi kesalahan internal saat menyusun jawaban. Silakan coba lagi atau hubungi admin jika masalah berlanjut.",
             "citations": [],
+            "follow_up_suggestions": [
+                "Coba kirim ulang pertanyaan Anda",
+                "Sederhanakan pertanyaan menjadi lebih singkat",
+            ],
             "error": str(e),
+            "error_code": "SUMMARIZER_FAILURE",
         }
 
     logger.info("[Summarizer] Jawaban disusun: %d karakter, %d sitasi", len(answer), len(citations))
-
     if not answer or not answer.strip():
         answer = "Maaf, terjadi kesalahan dalam menyusun jawaban. Silakan coba lagi dengan pertanyaan yang berbeda."
         citations = []
@@ -191,8 +214,15 @@ def run_summarizer_agent(state: GraphState) -> GraphState:
         **state,
         "final_answer": answer,
         "citations": citations,
-        "llm_usage": dict(state.get("llm_usage", {}) or {}),
+        "follow_up_suggestions": _build_follow_up_suggestions(query, intent, answer),
+        # FIX: sebelumnya usage hasil call summarizer dibuang (hanya state lama
+        # yang dikembalikan) → token/cost summarizer tidak pernah tercatat.
+        "llm_usage": usage_meta,
     }
+
+
+_SITASI_RE = re.compile(r"^SITASI:\s*$", re.MULTILINE)
+_JAWABAN_RE = re.compile(r"^JAWABAN:\s*$", re.MULTILINE)
 
 
 def _parse_summarizer_response(
@@ -203,11 +233,21 @@ def _parse_summarizer_response(
     text = response_text.strip()
     answer = text
 
-    if "SITASI:" in text:
-        parts = text.split("SITASI:", 1)
-        answer = parts[0].replace("JAWABAN:", "").strip()
-    elif "JAWABAN:" in text:
-        answer = text.replace("JAWABAN:", "").strip()
+    # Hanya pisahkan pada marker "SITASI:" yang berada di AWAL BARIS sendiri.
+    # Model kadang menulis "SITASI:" di tengah teks jawaban; split naif pada
+    # literal tersebut memotong jawaban yang sah. (Fix #aj-1)
+    sitasi_match = _SITASI_RE.search(text)
+    if sitasi_match:
+        answer = text[: sitasi_match.start()].strip()
+    else:
+        jawaban_match = _JAWABAN_RE.search(text)
+        if jawaban_match:
+            answer = text[jawaban_match.end():].strip()
+        else:
+            answer = re.sub(r"^\s*JAWABAN:\s*", "", text).strip()
+
+    # Buang label "JAWABAN:" yang mungkin tersisa di awal region jawaban.
+    answer = re.sub(r"^\s*JAWABAN:\s*", "", answer).strip()
 
     citations = []
     if source_documents:
@@ -252,3 +292,54 @@ def _get_doc_field(doc: dict, field: str) -> str | None:
         if value:
             return str(value)
     return None
+
+
+def _build_follow_up_suggestions(query: str, intent: str, answer: str) -> list[str]:
+    """Saran pertanyaan lanjutan kontekstual untuk user non-IT.
+
+    Tujuan: user tidak perlu menyusun prompt sendiri — cukup tap satu chip
+    untuk memperdalam jawaban. Saran digenerate berbasis rule (cepat, murah).
+    """
+    q_lower = query.lower()
+
+    # Definisi/penjelasan → dorong eksplorasi konteks & penerapan.
+    if intent == "comprehensive" or "apa itu" in q_lower or "jelaskan" in q_lower:
+        return [
+            "Jelaskan dengan bahasa yang lebih sederhana",
+            "Apa contoh penerapannya di tempat kerja?",
+            "Apa dasar atau aturan yang mengatur hal ini?",
+            "Apa konsekuensi jika tidak dipatuhi?",
+        ]
+
+    # Perbandingan → minta tabel/perbandingan aspek.
+    if intent == "analytical" or any(k in q_lower for k in ("bandingkan", "perbedaan", "vs")):
+        return [
+            "Tampilkan perbandingan dalam bentuk tabel",
+            "Manakah yang paling sesuai untuk kondisi saya?",
+            "Apa kelebihan dan kekurangan masing-masing?",
+        ]
+
+    # Prosedur/cara → minta langkah praktis.
+    if "cara" in q_lower or "langkah" in q_lower or "prosedur" in q_lower:
+        return [
+            "Tunjukkan langkah-langkahnya secara urut",
+            "Dokumen atau formulir apa saja yang diperlukan?",
+            "Siapa yang bertanggung jawab untuk setiap langkah?",
+            "Apa saja kesalahan yang harus dihindari?",
+        ]
+
+    # Daftar/listing → minta detail tiap item.
+    if intent == "comprehensive" or any(k in q_lower for k in ("daftar", "apa saja", "sebutkan")):
+        return [
+            "Jelaskan masing-masing item dengan lebih detail",
+            "Berapa jumlah atau kriterianya?",
+            "Manakah yang paling penting atau sering digunakan?",
+        ]
+
+    # Default: follow-up umum yang aman.
+    return [
+        "Jelaskan lebih detail",
+        "Berikan contoh konkretnya",
+        "Dokumen sumber mana yang paling relevan?",
+        "Apa implikasinya bagi karyawan?",
+    ]

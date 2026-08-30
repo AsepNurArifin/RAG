@@ -55,6 +55,14 @@ CREATE TABLE messages (
     citations JSONB DEFAULT '[]'::jsonb,
     confidence_score FLOAT,
     action_items JSONB DEFAULT '[]'::jsonb,
+    follow_up_suggestions JSONB DEFAULT '[]'::jsonb,
+    intent TEXT,
+    intent_type TEXT,
+    reflection_count INTEGER DEFAULT 0,
+    request_id TEXT,
+    trace_id TEXT,
+    status TEXT DEFAULT 'completed',
+    error_code TEXT,
     latency_ms INTEGER,
     model_used TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -75,6 +83,11 @@ CREATE TABLE query_logs (
     output_tokens INTEGER DEFAULT 0,
     total_tokens INTEGER DEFAULT 0,
     usage_details JSONB DEFAULT '{}'::jsonb,
+    request_id TEXT,
+    trace_id TEXT,
+    status TEXT DEFAULT 'completed',
+    session_id TEXT,
+    user_id UUID REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -118,5 +131,8 @@ CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_query_logs_intent ON query_logs(intent);
 CREATE INDEX IF NOT EXISTS idx_query_logs_created ON query_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_request_id ON messages(request_id);
+CREATE INDEX IF NOT EXISTS idx_query_logs_request_id ON query_logs(request_id);
+CREATE INDEX IF NOT EXISTS idx_query_logs_session ON query_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_parent_chunks_document ON parent_chunks(document_id);
 CREATE INDEX IF NOT EXISTS idx_chunk_hashes_document ON chunk_hashes(document_id);

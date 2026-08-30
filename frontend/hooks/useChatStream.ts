@@ -1,7 +1,98 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Message, QueryResponse } from "../types";
+import { ActionItem, Citation, Message, QueryResponse } from "../types";
 import { api } from "../lib/api";
-import { useActiveAgent } from "../context/ActiveAgentContext";
+import { useActiveAgent, type ActiveAgentType } from "../context/ActiveAgentContext";
+
+/**
+ * Satu-satunya tempat mapping API response (live) ke Message.
+ * History memakai mapper yang sama → shape pesan selalu identik.
+ */
+export function mapQueryResultToMessage(response: QueryResponse): Message {
+  return {
+    id: response.request_id || (Date.now() + 1).toString(),
+    role: "assistant",
+    content: response.answer,
+    citations: response.citations ?? [],
+    actionItems: response.action_items ?? [],
+    followUpSuggestions: response.follow_up_suggestions ?? [],
+    confidenceScore: response.confidence_score,
+    intent: response.intent,
+    intentType: response.intent_type,
+    reflectionCount: response.reflection_count,
+    latencyMs: response.latency_ms,
+    requestId: response.request_id,
+    traceId: response.trace_id ?? undefined,
+    status: response.status,
+  };
+}
+
+/** Shape pesan history dari API sessions (snake_case, JSONB bisa string/list). */
+export interface HistoryMessageResponse {
+  id?: string;
+  role?: string;
+  content?: string;
+  citations?: unknown;
+  action_items?: unknown;
+  follow_up_suggestions?: unknown;
+  confidence_score?: number;
+  intent?: string;
+  intent_type?: string;
+  reflection_count?: number;
+  latency_ms?: number;
+  request_id?: string;
+  trace_id?: string;
+  status?: string;
+  error_code?: string;
+}
+
+/** Mapping pesan history (snake_case dari API) ke Message — kontrak sama. */
+export function mapHistoryToMessage(raw: HistoryMessageResponse): Message {
+  const parseJsonArray = (v: unknown): unknown[] => {
+    if (v === null || v === undefined) return [];
+    if (typeof v === "string") {
+      try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+    }
+    return Array.isArray(v) ? (v as unknown[]) : [];
+  };
+  return {
+    id: raw.id || `hist-${Date.now()}-${Math.random()}`,
+    role: (raw.role === "assistant" || raw.role === "user" || raw.role === "system") ? raw.role : "assistant",
+    content: raw.content || "",
+    citations: parseJsonArray(raw.citations) as Citation[],
+    actionItems: parseJsonArray(raw.action_items) as ActionItem[],
+    followUpSuggestions: parseJsonArray(raw.follow_up_suggestions) as string[],
+    confidenceScore: raw.confidence_score ?? undefined,
+    intent: raw.intent ?? undefined,
+    intentType: raw.intent_type ?? undefined,
+    reflectionCount: raw.reflection_count ?? undefined,
+    latencyMs: raw.latency_ms ?? undefined,
+    requestId: raw.request_id ?? undefined,
+    traceId: raw.trace_id ?? undefined,
+    status: (raw.status === "completed" || raw.status === "degraded" || raw.status === "failed") ? raw.status : undefined,
+    errorCode: raw.error_code ?? undefined,
+  };
+}
+
+/**
+ * Mapping eksplisit nama node backend → agent pipeline UI.
+ * - "tools" adalah bagian dari tahap research (Tool Router jalan sebelum Researcher).
+ * - "reflection" adalah bagian dari tahap verification (retry loop setelah Verifier).
+ * Input dinormalisasi (trim + lowercase) agar variasi casing tidak jatuh ke "idle".
+ */
+const AGENT_ALIASES: Record<string, ActiveAgentType> = {
+  orchestrator: "orchestrator",
+  tools: "researcher",
+  researcher: "researcher",
+  verifier: "verifier",
+  reflection: "verifier",
+  summarizer: "summarizer",
+  executor: "executor",
+};
+
+export function mapAgent(raw: string): ActiveAgentType {
+  const key = (raw ?? "").trim().toLowerCase();
+  return AGENT_ALIASES[key] ?? "idle";
+}
 
 export function useChatStream(initialSessionId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -10,6 +101,8 @@ export function useChatStream(initialSessionId?: string) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Guard race: callback dari request lama tidak boleh menimpa request baru.
+  const activeRequestIdRef = useRef<string | null>(null);
 
   const { setActiveAgent } = useActiveAgent();
 
@@ -31,38 +124,17 @@ export function useChatStream(initialSessionId?: string) {
     scrollToBottom();
   }, [messages]);
 
-  // Agent cycling simulation while querying (REMOVED)
-  useEffect(() => {
-    if (!isLoading) {
-      setActiveAgent("idle");
-    }
-  }, [isLoading, setActiveAgent]);
+  // Lifecycle activeAgent dikelola eksplisit di callback (onResult/onError/
+  // cancelQuery/abort) — bukan via effect isLoading, agar tidak balapan
+  // dengan event "agent" dari stream.
 
   // Load history for a given session
   const loadSessionHistory = useCallback(async (sid: string) => {
     try {
       const data = await api.getSessionMessages(sid);
-      const loaded: Message[] = data.map((raw: Record<string, any>, i: number) => {
-        let parsedCitations = raw.citations || [];
-        let parsedActionItems = raw.action_items || [];
-        
-        if (typeof parsedCitations === 'string') {
-          try { parsedCitations = JSON.parse(parsedCitations); } catch(e) { parsedCitations = []; }
-        }
-        if (typeof parsedActionItems === 'string') {
-          try { parsedActionItems = JSON.parse(parsedActionItems); } catch(e) { parsedActionItems = []; }
-        }
-
-        return {
-          id: raw.id || `hist-${i}`,
-          role: raw.role,
-          content: raw.content,
-          citations: parsedCitations,
-          actionItems: parsedActionItems,
-          confidenceScore: raw.confidence_score,
-          latencyMs: raw.latency_ms,
-        };
-      });
+      const loaded: Message[] = data.map((raw: HistoryMessageResponse) =>
+        mapHistoryToMessage(raw)
+      );
       setMessages(loaded);
       setSessionId(sid);
     } catch (err) {
@@ -70,87 +142,85 @@ export function useChatStream(initialSessionId?: string) {
     }
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return;
+  // Helper: hapus pesan by ID (bukan by array position) saat cancel.
+  const removeMessageById = useCallback((id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  }, []);
 
-    // Add user message to UI immediately
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content,
-    };
-    
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
-    setActiveAgent("orchestrator");
+  const runStream = useCallback(
+    (content: string, userMessageId: string) => {
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      activeRequestIdRef.current = requestId;
 
-    // Cancel previous request if still running
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-    api.queryStream(
-      content,
-      sessionId,
-      (agent) => {
-        // Map LangGraph node names to our UI active agent states
-        if (agent.includes("orchestrator")) setActiveAgent("orchestrator");
-        else if (agent.includes("researcher")) setActiveAgent("researcher");
-        else if (agent.includes("verifier")) setActiveAgent("verifier");
-        else if (agent.includes("summarizer")) setActiveAgent("summarizer");
-        else if (agent.includes("executor")) setActiveAgent("executor");
-      },
-      (response: QueryResponse) => {
-        // Update session ID if this is the first interaction
-        if (!sessionId && response.session_id) {
-          setSessionId(response.session_id);
-        }
-
-        // Add assistant response to UI
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: response.answer,
-          citations: response.citations,
-          actionItems: response.action_items,
-          confidenceScore: response.confidence_score,
-          intent: response.intent,
-          reflectionCount: response.reflection_count,
-          latencyMs: response.latency_ms,
-        };
-
-        setMessages((prev) => [...prev, assistantMessage]);
-        setIsLoading(false);
-      },
-      (error: Error) => {
-        if (error.name === "AbortError") {
-          console.log("Stream query cancelled.");
-          // Remove the user message that triggered this cancelled query
-          setMessages((prev) => prev.slice(0, -1));
+      api.queryStream(
+        content,
+        sessionId,
+        (agent) => {
+          if (activeRequestIdRef.current !== requestId) return;
+          setActiveAgent(mapAgent(agent));
+        },
+        (response: QueryResponse) => {
+          if (activeRequestIdRef.current !== requestId) return;
+          if (!sessionId && response.session_id) {
+            setSessionId(response.session_id);
+          }
+          const assistantMessage = mapQueryResultToMessage(response);
+          setMessages((prev) => [...prev, assistantMessage]);
           setIsLoading(false);
           setActiveAgent("idle");
-          return;
-        }
-        console.error("Error sending message:", error);
-        
-        // Add error message to UI
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "system",
-          content: error.message || "Terjadi kesalahan sistem. Silakan coba lagi.",
-        };
-        
-        setMessages((prev) => [...prev, errorMessage]);
-        setIsLoading(false);
-      },
-      controller.signal
-    );
-  }, [sessionId, isLoading, setActiveAgent]);
+          activeRequestIdRef.current = null;
+        },
+        (error: Error) => {
+          if (activeRequestIdRef.current !== requestId) return;
+          if (error.name === "AbortError") {
+            console.log("Stream query cancelled.");
+            removeMessageById(userMessageId);
+            setIsLoading(false);
+            setActiveAgent("idle");
+            return;
+          }
+          console.error("Error sending message:", error);
+          setActiveAgent("idle");
+          const errorMessage: Message = {
+            id: `err_${Date.now()}`,
+            role: "system",
+            content: error.message || "Terjadi kesalahan sistem. Silakan coba lagi.",
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+          setIsLoading(false);
+          activeRequestIdRef.current = null;
+        },
+        controller.signal
+      );
+    },
+    [sessionId, setActiveAgent, removeMessageById]
+  );
+
+  const sendMessage = useCallback(
+    (content: string) => {
+      if (!content.trim() || isLoading) return;
+      const userMessage: Message = {
+        id: `usr_${Date.now()}`,
+        role: "user",
+        content,
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setIsLoading(true);
+      setActiveAgent("orchestrator");
+      runStream(content, userMessage.id);
+    },
+    [isLoading, setActiveAgent, runStream]
+  );
 
   // Cancel an in-flight query
   const cancelQuery = useCallback(() => {
+    activeRequestIdRef.current = null;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -160,82 +230,31 @@ export function useChatStream(initialSessionId?: string) {
   }, [setActiveAgent]);
 
   // Edit a user message and resend (Claude-like: remove all messages after the edited one)
-  const editAndResend = useCallback(async (messageId: string, newContent: string) => {
-    if (!newContent.trim() || isLoading) return;
+  const editAndResend = useCallback(
+    (messageId: string, newContent: string) => {
+      if (!newContent.trim() || isLoading) return;
 
-    // Find the message index
-    const messageIndex = messages.findIndex(m => m.id === messageId);
-    if (messageIndex === -1 || messages[messageIndex].role !== "user") return;
+      const messageIndex = messages.findIndex((m) => m.id === messageId);
+      if (messageIndex === -1 || messages[messageIndex].role !== "user") return;
 
-    // Cancel any in-flight request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      activeRequestIdRef.current = null;
 
-    // Keep messages up to (and including) the edited message, update its content
-    const updatedMessages = [
-      ...messages.slice(0, messageIndex),
-      { ...messages[messageIndex], content: newContent },
-    ];
+      const updatedMessages = [
+        ...messages.slice(0, messageIndex),
+        { ...messages[messageIndex], content: newContent },
+      ];
 
-    setMessages(updatedMessages);
-    setIsLoading(true);
-    setActiveAgent("orchestrator");
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    api.queryStream(
-      newContent,
-      sessionId,
-      (agent) => {
-        if (agent.includes("orchestrator")) setActiveAgent("orchestrator");
-        else if (agent.includes("researcher")) setActiveAgent("researcher");
-        else if (agent.includes("verifier")) setActiveAgent("verifier");
-        else if (agent.includes("summarizer")) setActiveAgent("summarizer");
-        else if (agent.includes("executor")) setActiveAgent("executor");
-      },
-      (response: QueryResponse) => {
-        if (!sessionId && response.session_id) {
-          setSessionId(response.session_id);
-        }
-
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: response.answer,
-          citations: response.citations,
-          actionItems: response.action_items,
-          confidenceScore: response.confidence_score,
-          intent: response.intent,
-          reflectionCount: response.reflection_count,
-          latencyMs: response.latency_ms,
-        };
-
-        setMessages((prev) => [...prev, assistantMessage]);
-        setIsLoading(false);
-      },
-      (error: Error) => {
-        if (error.name === "AbortError") {
-          console.log("Edit-and-resend cancelled.");
-          setIsLoading(false);
-          setActiveAgent("idle");
-          return;
-        }
-        console.error("Error in editAndResend:", error);
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "system",
-          content: error.message || "Terjadi kesalahan sistem. Silakan coba lagi.",
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-        setIsLoading(false);
-        setActiveAgent("idle");
-      },
-      controller.signal
-    );
-  }, [messages, sessionId, isLoading, setActiveAgent]);
+      setMessages(updatedMessages);
+      setIsLoading(true);
+      setActiveAgent("orchestrator");
+      runStream(newContent, messages[messageIndex].id);
+    },
+    [messages, isLoading, setActiveAgent, runStream]
+  );
 
   const clearChat = useCallback(() => {
     setMessages([]);

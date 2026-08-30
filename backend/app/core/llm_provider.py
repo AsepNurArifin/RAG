@@ -230,6 +230,12 @@ def invoke_llm_instrumented(
     """
     import random
 
+    # Fallback ke trace aktif per-request (ContextVar) bila caller tidak
+    # meneruskan trace eksplisit — agar SEMUA LLM call menempel ke trace query.
+    if trace is None:
+        from app.core.observability import get_active_trace
+        trace = get_active_trace()
+
     if usage_meta is None:
         usage_meta = {}
     generation = start_generation(trace, name=f"llm_{agent_name}", meta={"task_type": task_type})

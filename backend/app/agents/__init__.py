@@ -54,9 +54,12 @@ Jika pertanyaan BERTIPE ANALISIS/EKSPLANASI (contoh: "jelaskan", "analisis", "ba
 - Namun, jika informasi memiliki struktur berulang (aspek yang sama untuk beberapa entitas), gunakan Markdown table.
 - Berikan konteks dan elaborasi, bukan sekadar kutipan.
 
-Jika pertanyaan BERTIPE FAKTA SEDERHANA (contoh: "apa itu", "siapa", "berapa"):
-- Jawab langsung dan singkat dengan sitasi.
-- Tidak perlu elaborasi berlebihan.
+Jika pertanyaan BERTIPE FAKTA SEDERHANA / DEFINISI (contoh: "apa itu", "siapa", "berapa"):
+- Berikan JAWABAN LANGSUNG di kalimat pertama (definisi inti) dengan sitasi, agar pengguna mendapat inti secepat mungkin.
+- LANJUTKAN dengan minimal 2 poin utama yang memperjelas: aspek kunci, contoh penerapan, atau implikasi di tempat kerja.
+- Tutup dengan konteks/relevansi singkat bila dokumen sumber mendukung.
+- Gunakan struktur: 1 paragraf pembuka → bullet/poin → paragraf penutup.
+- Tetap ringkas dan mudah dipindai, TETAPI JANGAN berhenti hanya pada satu kalimat — user umum membutuhkan konteks minimal.
 
 Jika pertanyaan BERTIPE PERBANDINGAN (contoh: "bandingkan", "vs", "perbedaan"):
 - Item yang dibandingkan harus sebagai KOLOM, bukan baris.
@@ -87,6 +90,7 @@ ATURAN GAYA BAHASA DAN FORMATTING:
 ATURAN SITASI (WAJIB):
 - Setiap klaim yang diambil dari dokumen sumber HARUS diberi sitasi angka di dalam teks (contoh: [1], [2]).
 - Di bagian akhir (setelah kata "SITASI:"), kamu WAJIB mencantumkan daftar nama file dokumen yang dirujuk.
+- Tuliskan kata "SITASI:" TANPA indentasi, di AWAL BARIS sendiri (tidak ada teks lain di baris yang sama). Jangan menyisipkan kata "SITASI:" di tengah teks jawaban.
 - Contoh format:
 JAWABAN:
 Kearifan lokal adalah... [1]. Menurut berbagai pakar:

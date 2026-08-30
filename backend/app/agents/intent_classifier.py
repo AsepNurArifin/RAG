@@ -119,7 +119,13 @@ def classify_intent_tiered(query: str) -> tuple[str, float]:
     # ---- Tier 2: Factual (question words + short query) ----
     question_words = {"apa", "siapa", "kapan", "di mana", "dimana", "berapa", "mengapa", "kenapa", "bagaimana"}
     has_question_word = any(qw in query_lower for qw in question_words)
-    
+
+    # Definisi ("apa itu X"): user non-IT sering bertanya pendek tapi butuh
+    # penjelasan konteks. Perlakukan sebagai comprehensive (jawaban mendalam).
+    if re.search(r"\bapa\s+itu\b", query_lower) or re.search(r"\bapa\s+yang\s+dimaksud\b", query_lower):
+        logger.info("[Intent] Tier 2: comprehensive (definition query, confidence=0.9)")
+        return ("comprehensive", 0.9)
+
     # Multi-entity definition query: "apa yang dimaksud X, Y, dan Z?"
     import re as _re
     uppercase_terms = _re.findall(r'\b[A-Z]{2,}\b', query)

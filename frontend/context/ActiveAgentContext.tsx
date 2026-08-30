@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState } from "react";
 
-type ActiveAgentType = "idle" | "orchestrator" | "researcher" | "verifier" | "summarizer" | "executor";
+export type ActiveAgentType = "idle" | "orchestrator" | "researcher" | "verifier" | "summarizer" | "executor";
 
 interface ActiveAgentContextType {
   activeAgent: ActiveAgentType;
