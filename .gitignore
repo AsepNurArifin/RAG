@@ -121,3 +121,5 @@ Thumbs.db
 # Playwright MCP artifacts
 .playwright-mcp/
 
+pi-session-*.html
+
