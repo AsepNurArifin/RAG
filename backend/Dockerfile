@@ -41,6 +41,12 @@ COPY --chown=appuser:appuser --from=builder /app/.venv /app/.venv
 # Salin kode aplikasi kamu
 COPY --chown=appuser:appuser . .
 
+# Fase 3C (plan_optimasi.md): bersihkan bytecode cache agar layer image ramping.
+# NOTE: dependency berat (torch/sentence-transformers/transformers) TIDAK lagi
+# masuk image — hanya grup "torch" optional via `uv sync --group torch` (dev).
+# Runtime embedding/reranker memakai ONNX (onnxruntime + tokenizers).
+RUN find /app -type d -name __pycache__ -prune -exec rm -rf {} +
+
 # Siapkan folder untuk model cache dan uploads dengan permission yang benar
 RUN mkdir -p /app/uploads /app/model_cache \
     && chown -R appuser:appuser /app/uploads /app/model_cache

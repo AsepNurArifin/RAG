@@ -8,7 +8,7 @@ Strategi:
    konsisten; dijalankan manual setelah tools/export_reranker_onnx.py.
 
 Jalankan tes parity eksplisit:
-    uv run --extra torch pytest tests/test_reranker_onnx.py -v
+    uv run --group torch pytest tests/test_reranker_onnx.py -v
 """
 
 import importlib.util

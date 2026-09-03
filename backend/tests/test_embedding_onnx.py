@@ -8,7 +8,7 @@ Strategi:
    tinggi antara embedding ONNX dan torch, konsisten dgn re-index.
 
 Jalankan tes parity eksplisit (setelah tools/export_embedding_onnx.py):
-    uv run --extra torch pytest tests/test_embedding_onnx.py -v
+    uv run --group torch pytest tests/test_embedding_onnx.py -v
 """
 import importlib.util
 import os

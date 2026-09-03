@@ -16,8 +16,8 @@ Artifact yang dihasilkan (satu direktori):
     parity_report.txt     — hasil cek kesetaraan torch vs onnx
 
 Penggunaan (jalankan di mesin dengan torch + HF):
-    uv run --extra torch python tools/export_embedding_onnx.py
-    uv run --extra torch python tools/export_embedding_onnx.py --no-quantize
+    uv run --group torch python tools/export_embedding_onnx.py
+    uv run --group torch python tools/export_embedding_onnx.py --no-quantize
 
 ⚠️ Setelah berganti embedding representation, WAJIB reindex:
     python -m scripts.reindex --clear     # hapus vector lama lalu rebuild

@@ -13,9 +13,9 @@ Artifact yang dihasilkan (satu direktori):
     parity_report.txt    — hasil cek kesetaraan torch vs onnx
 
 Penggunaan (jalankan di mesin dengan torch + HF, mis. laptop dev):
-    uv run --extra torch python tools/export_reranker_onnx.py \
+    uv run --group torch python tools/export_reranker_onnx.py \
         --model BAAI/bge-reranker-v2-m3
-    uv run --extra torch python tools/export_reranker_onnx.py --no-quantize   # FP32
+    uv run --group torch python tools/export_reranker_onnx.py --no-quantize   # FP32
 
 Catatan kesetaraan: skor akhir = sigmoid(logit). Perbedaan torch vs onnx INT8
 umumnya < 0.02; urutan (ranking) dijamin identik untuk pasangan yang sama.
