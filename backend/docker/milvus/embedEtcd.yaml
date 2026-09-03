@@ -1,0 +1,8 @@
+# etcd embedded config untuk Milvus standalone (Fase 4 plan_optimasi.md).
+# Dipasang sebagai /milvus/configs/embedEtcd.yaml saat container milvus start.
+# Referensi: pola resmi standalone_embed dari Milvus (single-node deployment).
+listen-client-urls: http://0.0.0.0:2379
+advertise-client-urls: http://0.0.0.0:2379
+quota-backend-bytes: 4294967296
+auto-compaction-mode: revision
+auto-compaction-retention: '1000'
