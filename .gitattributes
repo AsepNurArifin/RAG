@@ -1,0 +1,2 @@
+# Exclude HTML from GitHub Language Statistics (Linguist)
+*.html linguist-detectable=false
