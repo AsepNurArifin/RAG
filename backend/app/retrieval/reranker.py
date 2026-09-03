@@ -63,33 +63,19 @@ class OnnxReranker:
     """
 
     def __init__(self, model_path: Path, max_length: int = 256, threads: int = 0):
-        import onnxruntime as ort
-        from tokenizers import Tokenizer
+        import numpy as np
+
+        from app.core.onnx_utils import load_onnx_tokenizer, new_cpu_session
 
         if not model_path.exists():
             raise FileNotFoundError(f"ONNX reranker tidak ditemukan: {model_path}")
 
-        tokenizer_json = model_path.parent / "tokenizer.json"
-        if not tokenizer_json.exists():
-            raise FileNotFoundError(f"tokenizer.json tidak ditemukan di {model_path.parent}")
-
         # --- Session options: thread + optimasi (CPU only) ---
-        so = ort.SessionOptions()
-        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        if threads and threads > 0:
-            so.intra_op_num_threads = threads
-            so.inter_op_num_threads = 1
-
-        self._session = ort.InferenceSession(
-            str(model_path), sess_options=so, providers=["CPUExecutionProvider"]
-        )
+        self._session = new_cpu_session(model_path, threads=threads)
 
         # --- Tokenizer (pair encoding: [CLS] q [SEP] d [SEP]) ---
-        self._tok = Tokenizer.from_file(str(tokenizer_json))
-        self._tok.enable_truncation(max_length=max_length)
-        pad_token = _resolve_pad_token(self._tok, model_path.parent)
-        pad_id = self._tok.token_to_id(pad_token)
-        self._tok.enable_padding(pad_id=pad_id, pad_token=pad_token)
+        self._tok = load_onnx_tokenizer(model_path.parent, max_length=max_length)
+        self._np = np
 
         self._input_names = [i.name for i in self._session.get_inputs()]
         self._output_name = self._session.get_outputs()[0].name
@@ -110,29 +96,12 @@ class OnnxReranker:
         if "token_type_ids" in self._input_names:
             feed["token_type_ids"] = [e.type_ids for e in encoded]
 
-        import numpy as np
         logits = self._session.run([self._output_name], feed)[0]  # (n, 1)
-        scores = np.asarray(logits).reshape(-1).astype(float)
+        scores = self._np.asarray(logits).reshape(-1).astype(float)
         # Model dilatih dengan BCE — terapkan sigmoid agar setara predict()
         # sentence-transformers (CrossEncoder klasifikasi biner).
-        scores = 1.0 / (1.0 + np.exp(-scores))
+        scores = 1.0 / (1.0 + self._np.exp(-scores))
         return scores.tolist()
-
-
-def _resolve_pad_token(tok, model_dir: Path) -> str:
-    """Pad token: cek tokenizer_config.json, lalu fallback token umum."""
-    try:
-        import json
-        cfg = json.loads((model_dir / "tokenizer_config.json").read_text(encoding="utf-8"))
-        pad = cfg.get("pad_token")
-        if pad and tok.token_to_id(pad) is not None:
-            return pad
-    except Exception:
-        pass
-    for candidate in ("<pad>", "[PAD]", "<s>", "<unk>"):
-        if tok.token_to_id(candidate) is not None:
-            return candidate
-    raise RuntimeError("Tidak dapat menentukan pad token untuk tokenizer reranker.")
 
 
 # --------------------------------------------------------------------------- #

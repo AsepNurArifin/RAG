@@ -67,9 +67,20 @@ class Settings:
     # Temporal
     TEMPORAL_HOST: str = field(default_factory=lambda: os.getenv("TEMPORAL_HOST", "localhost:7233"))
 
-    # Embedding
+    # Embedding — plan_optimasi.md Fase 3B: ONNX (BGE-M3, CLS pooling + L2
+    # normalize) default. Backend "pytorch" (sentence-transformers/transformers)
+    # hanya untuk fallback dev/ekspor ulang.
+    EMBEDDING_BACKEND: str = field(
+        default_factory=lambda: os.getenv("EMBEDDING_BACKEND", "onnx").strip().lower()
+    )
     EMBEDDING_MODEL: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"))
-    EMBEDDING_DIMENSIONS: int = 1024
+    # Override direktori ONNX (jika kosong, diturunkan dari HF_HOME / model_cache)
+    EMBEDDING_ONNX_DIR: str = field(default_factory=lambda: os.getenv("EMBEDDING_ONNX_DIR", ""))
+    EMBEDDING_MAX_LENGTH: int = field(default_factory=lambda: _safe_int(os.getenv("EMBEDDING_MAX_LENGTH", "8192"), "EMBEDDING_MAX_LENGTH"))
+    EMBEDDING_BATCH_SIZE: int = field(default_factory=lambda: _safe_int(os.getenv("EMBEDDING_BATCH_SIZE", "32"), "EMBEDDING_BATCH_SIZE"))
+    EMBEDDING_DIMENSIONS: int = field(
+        default_factory=lambda: _safe_int(os.getenv("EMBEDDING_DIMENSIONS", "1024"), "EMBEDDING_DIMENSIONS")
+    )
 
     # Reranker — plan_optimasi.md Fase 3A: ONNX INT8 default (runtime ringan,
     # tanpa torch/sentence-transformers). Fallback "pytorch" hanya dipakai saat

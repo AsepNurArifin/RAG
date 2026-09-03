@@ -56,38 +56,84 @@ class TestExtractor:
     @patch("pymupdf.open")
     @patch("pymupdf4llm.to_markdown")
     @patch("httpx.post")
-    def test_extract_pdf_digital(self, mock_post, mock_to_markdown, mock_pymupdf_open):
-        """Test ekstrak PDF menggunakan Docling Serve REST API."""
-        # Mock pymupdf4llm.to_markdown to return 1 page
+    def test_extract_pdf_table_native_pymupdf(self, mock_post, mock_to_markdown, mock_pymupdf_open):
+        """Fase 2: DOCLING_ENABLED=false (default) → tabel via PyMuPDF native, Docling TIDAK dipanggil."""
+        from app.core.config import settings
+        assert settings.DOCLING_ENABLED is False  # default produksi
+
         mock_to_markdown.return_value = [{"text": "Page 1 content"}]
-        
-        # Mock page to return a diagram (50 drawings >= DIAGRAM_THRESHOLD=30)
+
+        # Halaman berisi tabel yang terdeteksi find_tables()
+        mock_table = MagicMock()
+        mock_table.to_markdown.return_value = (
+            "| Kolom A | Kolom B |\n|---|---|\n| Nilai Satu | Nilai Dua |"
+        )
+        mock_tabs = MagicMock()
+        mock_tabs.tables = [mock_table]
+
         mock_page = MagicMock()
         mock_page.number = 0
-        mock_page.get_drawings.return_value = [None] * 50
-        
+        mock_page.get_text.return_value = "Judul bagian awal dokumen pengantar.\n"
+        mock_page.find_tables.return_value = mock_tabs
+
         mock_doc = MagicMock()
         mock_doc.__len__.return_value = 1
         mock_doc.__getitem__.return_value = mock_page
         mock_pymupdf_open.return_value = mock_doc
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "document": {
-                "md_content": "Ini adalah teks hasil konversi Docling."
-            }
-        }
-        mock_response.status_code = 200
-        mock_post.return_value = mock_response
 
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             tmp_path = f.name
 
         try:
             result = extract_text(tmp_path, "pdf")
-            assert "hasil konversi Docling" in result
+            assert "Nilai Satu" in result, "Tabel harus terekstrak via PyMuPDF native"
+            assert "Kolom A" in result
+            mock_post.assert_not_called()  # Docling TIDAK boleh dipanggil saat OFF
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+
+    @patch("pymupdf.open")
+    @patch("pymupdf4llm.to_markdown")
+    @patch("httpx.post")
+    def test_extract_pdf_docling_when_enabled(self, mock_post, mock_to_markdown, mock_pymupdf_open):
+        """DOCLING_ENABLED=true (backfill eksternal) → jalur Docling REST tetap dipakai."""
+        from app.core.config import settings
+
+        old = settings.DOCLING_ENABLED
+        object.__setattr__(settings, "DOCLING_ENABLED", True)
+        try:
+            mock_to_markdown.return_value = [{"text": "Page 1 content"}]
+
+            mock_page = MagicMock()
+            mock_page.number = 0
+            mock_page.get_drawings.return_value = [None] * 50
+            mock_tabs = MagicMock()
+            mock_tabs.tables = [MagicMock()]
+            mock_page.find_tables.return_value = mock_tabs
+
+            mock_doc = MagicMock()
+            mock_doc.__len__.return_value = 1
+            mock_doc.__getitem__.return_value = mock_page
+            mock_pymupdf_open.return_value = mock_doc
+
+            mock_response = MagicMock()
+            mock_response.json.return_value = {
+                "document": {"md_content": "Ini adalah teks hasil konversi Docling."}
+            }
+            mock_response.status_code = 200
+            mock_post.return_value = mock_response
+
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+                tmp_path = f.name
+
+            try:
+                result = extract_text(tmp_path, "pdf")
+                assert "hasil konversi Docling" in result
+                mock_post.assert_called_once()
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        finally:
+            object.__setattr__(settings, "DOCLING_ENABLED", old)
 
     @patch("docx.Document")
     def test_extract_docx(self, mock_docx):

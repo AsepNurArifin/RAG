@@ -2,12 +2,19 @@
 Document Embedder — EnterpriseMind AI.
 
 Generate embeddings dan simpan ke Milvus vector store.
+
+Embedding backend (plan_optimasi.md Fase 3B):
+- Default "onnx": BAAI/bge-m3 diekspor ke ONNX INT8, runtime onnxruntime +
+  tokenizers (tanpa torch / sentence-transformers / langchain-huggingface).
+- Fallback "pytorch": transformers AutoModel (dev/ekspor) — pooling SAMA
+  (CLS + L2 normalize) sehingga parity terjaga.
+- Objek embedding duck-typed: menyediakan embed_documents()/embed_query()
+  sehingga tetap kompatibel dengan LangChain Milvus store.
+
 Singleton pattern untuk embedding model dan vector store.
 """
 import logging
-
-from langchain_milvus import Milvus
-from langchain_huggingface import HuggingFaceEmbeddings
+from pathlib import Path
 
 from app.core.config import settings
 from app.ingestion.chunker import DocumentChunk
@@ -15,28 +22,214 @@ from app.ingestion.chunker import DocumentChunk
 logger = logging.getLogger(__name__)
 
 _embedding_model = None
+_embedding_backend: str | None = None  # "onnx" | "pytorch"
 
 
-def get_embedding_model() -> HuggingFaceEmbeddings:
-    """Singleton. Downloads model on first call if not cached."""
-    global _embedding_model
-    if _embedding_model is None:
-        logger.info("Inisialisasi embedding model: %s", settings.EMBEDDING_MODEL)
-        _embedding_model = HuggingFaceEmbeddings(
-            model_name=settings.EMBEDDING_MODEL,
-            model_kwargs={
-                "device": "cpu",
-                "trust_remote_code": True,
-            },
-            encode_kwargs={
-                "normalize_embeddings": True,
-            },
+# --------------------------------------------------------------------------- #
+# Lokasi artifact ONNX
+# --------------------------------------------------------------------------- #
+def _hf_cache_base() -> Path:
+    """Direktori cache model. HF_HOME di set di compose (VPS: /app/model_cache)."""
+    hf_home = _env("HF_HOME", "")
+    if hf_home:
+        return Path(hf_home)
+    # Dev default: <repo>/backend/model_cache
+    return Path(__file__).resolve().parents[2] / "model_cache"
+
+
+def _env(key: str, default: str) -> str:
+    import os
+    return os.getenv(key, default).strip()
+
+
+def embedding_onnx_dir() -> Path:
+    """Direktori artifact ONNX untuk model embedding (export_embedding_onnx.py)."""
+    if settings.EMBEDDING_ONNX_DIR:
+        return Path(settings.EMBEDDING_ONNX_DIR)
+    slug = settings.EMBEDDING_MODEL.rstrip("/").split("/")[-1]
+    return _hf_cache_base() / "onnx" / f"embedding-{slug}"
+
+
+# --------------------------------------------------------------------------- #
+# Embedding: CLS pooling + L2 normalize (BGE-M3, konsisten kedua backend)
+# --------------------------------------------------------------------------- #
+class OnnxEmbedding:
+    """BGE-M3 via onnxruntime (INT8): CLS pooling + L2 normalize.
+
+    Duck-typed LangChain Embeddings — embed_documents()/embed_query().
+
+    Artifact di embedding_onnx_dir():
+        model.onnx       — encoder XLM-R (output last_hidden_state)
+        tokenizer.json   — fast tokenizer (tokenizers)
+    """
+
+    def __init__(self, model_path: Path, threads: int = 0):
+        import numpy as np
+
+        from app.core.onnx_utils import load_onnx_tokenizer, new_cpu_session
+
+        if not model_path.exists():
+            raise FileNotFoundError(f"ONNX embedding tidak ditemukan: {model_path}")
+
+        self.model_name = settings.EMBEDDING_MODEL
+        self.dim = settings.EMBEDDING_DIMENSIONS
+        self._np = np
+
+        self._session = new_cpu_session(model_path, threads=threads)
+        self._tok = load_onnx_tokenizer(model_path.parent, max_length=settings.EMBEDDING_MAX_LENGTH)
+
+        self._input_names = [i.name for i in self._session.get_inputs()]
+        self._output_name = self._session.get_outputs()[0].name
+        logger.info("ONNX embedding loaded: %s (threads=%s)", model_path, threads or "auto")
+
+    # --- inti embedding ---------------------------------------------------- #
+    def _embed(self, texts: list[str]) -> list[list[float]]:
+        np = self._np
+        results: list[list[float]] = []
+        batch_size = settings.EMBEDDING_BATCH_SIZE
+        for start in range(0, len(texts), batch_size):
+            batch = texts[start:start + batch_size]
+            encoded = self._tok.encode_batch(batch)
+            feed = {
+                "input_ids": [e.ids for e in encoded],
+                "attention_mask": [e.attention_mask for e in encoded],
+            }
+            if "token_type_ids" in self._input_names:
+                feed["token_type_ids"] = [e.type_ids for e in encoded]
+
+            hidden = self._session.run([self._output_name], feed)[0]  # (B, S, D)
+            cls = np.asarray(hidden)[:, 0, :]                          # CLS pooling
+            norm = np.linalg.norm(cls, axis=1, keepdims=True)          # L2 normalize
+            norm[norm == 0] = 1.0
+            results.extend((cls / norm).astype("float32").tolist())
+        return results
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """LangChain contract — dipanggil Milvus.add_texts()."""
+        if not texts:
+            return []
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        """LangChain contract — dipanggil Milvus.similarity_search()."""
+        return self._embed([text])[0]
+
+
+class TorchEmbedding:
+    """BGE-M3 via transformers (fallback dev/ekspor) — pooling identik dgn ONNX."""
+
+    def __init__(self, model_name: str):
+        import torch
+        from transformers import AutoModel, AutoTokenizer
+
+        self._torch = torch
+        self.model_name = model_name
+        self.dim = settings.EMBEDDING_DIMENSIONS
+        logger.info("Initializing torch embedding model: %s...", model_name)
+        self._tok = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        self._model = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+        self._model.eval()
+        logger.info("Torch embedding loaded.")
+
+    def _embed(self, texts: list[str]) -> list[list[float]]:
+        torch = self._torch
+        results: list[list[float]] = []
+        batch_size = settings.EMBEDDING_BATCH_SIZE
+        with torch.no_grad():
+            for start in range(0, len(texts), batch_size):
+                batch = texts[start:start + batch_size]
+                enc = self._tok(
+                    batch,
+                    padding=True,
+                    truncation=True,
+                    max_length=settings.EMBEDDING_MAX_LENGTH,
+                    return_tensors="pt",
+                )
+                out = self._model(**enc).last_hidden_state  # (B, S, D)
+                cls = out[:, 0, :]
+                norm = cls.norm(dim=1, keepdim=True)
+                norm[norm == 0] = 1.0
+                results.extend((cls / norm).cpu().numpy().astype("float32").tolist())
+        return results
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._embed([text])[0]
+
+
+# --------------------------------------------------------------------------- #
+# Singleton
+# --------------------------------------------------------------------------- #
+def get_embedding_model():
+    """Get embedding model (singleton, lazy load). Backend ONNX default.
+
+    Prioritas:
+      1. "onnx" — artifact ONNX di embedding_onnx_dir(); bila belum tersedia &
+         torch terpasang → fallback sementara ke pytorch + warning.
+      2. "pytorch" — eksplisit (dev / ekspor model).
+    Mengembalikan objek duck-typed dengan embed_documents()/embed_query().
+    """
+    global _embedding_model, _embedding_backend
+
+    if _embedding_model is not None:
+        return _embedding_model
+
+    backend = (settings.EMBEDDING_BACKEND or "onnx").lower()
+
+    if backend in ("onnx", "auto", ""):
+        model_dir = embedding_onnx_dir()
+        model_path = model_dir / "model.onnx"
+        if model_path.exists():
+            try:
+                _embedding_model = OnnxEmbedding(model_path, threads=settings.ORT_THREADS)
+                _embedding_backend = "onnx"
+                return _embedding_model
+            except Exception as e:
+                logger.error("Gagal load ONNX embedding: %s — fallback ke pytorch.", e)
+                _embedding_model = None
+        else:
+            logger.warning(
+                "ONNX embedding artifact tidak ditemukan di %s — mencoba fallback "
+                "pytorch. Jalankan tools/export_embedding_onnx.py untuk produksi.",
+                model_dir,
+            )
+
+    try:
+        _embedding_model = TorchEmbedding(settings.EMBEDDING_MODEL)
+        _embedding_backend = "pytorch"
+        logger.warning("EMBEDDING_BACKEND efektif = pytorch (fallback). Produksi gunakan ONNX.")
+        return _embedding_model
+    except Exception as e:
+        logger.error(
+            "Gagal load embedding (onnx & pytorch): %s. "
+            "Pastikan artifact ONNX ada atau dependency torch terpasang.", e,
         )
-    return _embedding_model
+        raise RuntimeError(
+            f"Embedding model tidak tersedia. Export ONNX dulu: "
+            f"tools/export_embedding_onnx.py → {embedding_onnx_dir()}"
+        ) from e
 
 
-def get_vector_store() -> Milvus:
-    """Connects to Milvus standalone server with robust connection handling."""
+def get_embedding_backend() -> str | None:
+    """Backend yang aktif ('onnx'/'pytorch'/None) — untuk observability & tes."""
+    get_embedding_model()
+    return _embedding_backend
+
+
+# --------------------------------------------------------------------------- #
+# Vector store (LangChain Milvus)
+# --------------------------------------------------------------------------- #
+def get_vector_store():
+    """Connects to Milvus standalone server dengan robust connection handling.
+
+    embedding_function berupa objek duck-typed (embed_documents/embed_query),
+    sehingga LangChain Milvus tetap bekerja tanpa langchain-huggingface.
+    """
+    from langchain_milvus import Milvus
     from pymilvus import connections
 
     logger.info("Inisialisasi Milvus vector store: uri=%s, collection=%s", settings.MILVUS_URI, settings.MILVUS_COLLECTION)
