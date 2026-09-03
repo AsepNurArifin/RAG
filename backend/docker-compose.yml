@@ -6,6 +6,11 @@
 #   docker compose up -d      # Start services
 #   docker compose down        # Stop services
 #   docker compose logs -f     # View logs
+#
+# Catatan optimasi disk (plan_optimasi.md Fase 0):
+#   - Temporal memakai postgres-app (container temporal-db dihapus)
+#   - temporal-ui dipindah ke docker-compose.dev.yml (khusus lokal)
+#   - Docling di-pin ke varian CPU (docling-serve-cpu) — bukan tag :latest
 
 services:
   milvus-etcd:
@@ -75,37 +80,24 @@ services:
     networks:
       - enterprisemind_net
 
-  temporal-db:
-    image: postgres:16-alpine
-    container_name: enterprisemind_temporal_db
-    environment:
-      - POSTGRES_DB=temporal
-      - POSTGRES_USER=temporal
-      - POSTGRES_PASSWORD=${TEMPORAL_PASSWORD:-temporal_password}
-    volumes:
-      - temporal_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U temporal"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - enterprisemind_net
-
   temporal:
     image: temporalio/auto-setup:1.24.0
     container_name: enterprisemind_temporal
+    # Temporal memakai PostgreSQL aplikasi (postgres-app) yang sama.
+    # auto-setup membuat database temporal & temporal_visibility otomatis
+    # saat pertama kali connect (user postgres = superuser).
     environment:
       - DB=postgres12
       - DB_PORT=5432
-      - POSTGRES_USER=temporal
-      - POSTGRES_PWD=${TEMPORAL_PASSWORD:-temporal_password}
-      - POSTGRES_SEEDS=temporal-db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-Password}
+      - POSTGRES_SEEDS=postgres-app
+      - DBNAME=temporal
+      - VISIBILITY_DBNAME=temporal_visibility
     ports:
       - "7233:7233"
     depends_on:
-      temporal-db:
+      postgres-app:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -118,6 +110,9 @@ services:
       - POSTGRES_DB=enterprisemind
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Password}
+    # Sekarang menampung 2 database: enterprisemind (app) + temporal (+temporal_visibility).
+    # max_connections dinaikkan ke 200 agar cukup untuk app + Temporal.
+    command: ["postgres", "-c", "max_connections=200"]
     ports:
       - "5432:5432"
     volumes:
@@ -133,22 +128,10 @@ services:
     networks:
       - enterprisemind_net
 
-  temporal-ui:
-    image: temporalio/ui:2.28.0
-    container_name: enterprisemind_temporal_ui
-    environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
-    ports:
-      - "8081:8080"
-    depends_on:
-      - temporal
-    restart: unless-stopped
-    networks:
-      - enterprisemind_net
-
   docling:
-    image: quay.io/docling-project/docling-serve:latest
+    # Varian CPU resmi (~4.4 GB, bukan ~8.7 GB) + versi di-pin (bukan :latest).
+    # Fase 2 plan_optimasi.md akan menghapus service ini sepenuhnya.
+    image: quay.io/docling-project/docling-serve-cpu:v1.18.0
     container_name: enterprisemind_docling
     environment:
       - DOCLING_SERVE_ENABLE_UI=true
@@ -177,8 +160,6 @@ volumes:
   milvus_data:
     driver: local
   postgres_app_data:
-    driver: local
-  temporal_data:
     driver: local
   docling_models:
     driver: local

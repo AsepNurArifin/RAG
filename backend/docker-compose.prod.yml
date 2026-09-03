@@ -55,9 +55,6 @@ services:
       - enterprisemind_net
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: enterprisemind_backend:latest
     container_name: enterprisemind_worker
 

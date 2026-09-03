@@ -23,6 +23,21 @@ tests/
 .pytest_cache/
 htmlcov/
 .coverage
+.ruff_cache/
+.mypy_cache/
+
+# Runtime / user data (tidak perlu masuk image)
+uploads/
+model_cache/
+milvus_data/
+temporal_data/
+chroma_db/
+
+# File data besar (training PDF, gambar) — JSON konfigurasi tetap ikut
+*.pdf
+*.png
+*.pptx
+*.docx
 
 # Miscellaneous
 *.log

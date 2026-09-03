@@ -1,0 +1,23 @@
+# EnterpriseMind AI — Docker Compose Development Override
+# Berisi service yang HANYA dibutuhkan saat development lokal (TIDAK di produksi).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d temporal-ui
+#
+# temporal-ui dipindah ke sini dari docker-compose.yml untuk menghemat
+# ~0.15 GB disk + ~150 MB RAM di VPS produksi (plan_optimasi.md Fase 0.3).
+
+services:
+  temporal-ui:
+    image: temporalio/ui:2.28.0
+    container_name: enterprisemind_temporal_ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8081:8080"
+    depends_on:
+      - temporal
+    restart: unless-stopped
+    networks:
+      - enterprisemind_net
