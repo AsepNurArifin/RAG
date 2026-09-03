@@ -71,6 +71,19 @@ class Settings:
     EMBEDDING_MODEL: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"))
     EMBEDDING_DIMENSIONS: int = 1024
 
+    # Reranker — plan_optimasi.md Fase 3A: ONNX INT8 default (runtime ringan,
+    # tanpa torch/sentence-transformers). Fallback "pytorch" hanya dipakai saat
+    # berkas ONNX belum tersedia / RERANKER_BACKEND=pytorch (dev, ekspor model).
+    RERANKER_BACKEND: str = field(
+        default_factory=lambda: os.getenv("RERANKER_BACKEND", "onnx").strip().lower()
+    )
+    RERANKER_MODEL: str = field(default_factory=lambda: os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3"))
+    # Override direktori ONNX (jika kosong, diturunkan dari HF_HOME / model_cache)
+    RERANKER_ONNX_DIR: str = field(default_factory=lambda: os.getenv("RERANKER_ONNX_DIR", ""))
+    RERANKER_MAX_LENGTH: int = field(default_factory=lambda: _safe_int(os.getenv("RERANKER_MAX_LENGTH", "256"), "RERANKER_MAX_LENGTH"))
+    # Threads inference bersama embedding+reranker (0 = biarkan onnxruntime memilih)
+    ORT_THREADS: int = field(default_factory=lambda: _safe_int(os.getenv("ORT_THREADS", "0"), "ORT_THREADS"))
+
     # Agent Thresholds
     CONFIDENCE_THRESHOLD: float = 0.6
     MAX_REFLECTION_ITERATIONS: int = 1

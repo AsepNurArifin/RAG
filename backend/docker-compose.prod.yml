@@ -29,6 +29,9 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib di-set}@postgres-app:5432/enterprisemind
       MILVUS_URI: http://milvus:19530
       TEMPORAL_HOST: temporal:7233
+      # --- Reranker & Embedding (Fase 3: ONNX, self-hosted) ---
+      RERANKER_BACKEND: onnx
+      ORT_THREADS: "0"
       MINIO_ENDPOINT: milvus-minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY wajib di-set}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY wajib di-set}
