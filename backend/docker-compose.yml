@@ -1,16 +1,10 @@
 # EnterpriseMind AI — Docker Compose
-# Milvus (Vector DB) + Temporal + PostgreSQL (application DB) + Docling
+# Milvus (Vector DB) + Temporal + PostgreSQL (application DB)
 # Backend & Temporal Worker tetap run locally di host (uvicorn / python -m app.temporal.worker)
 #
-# Usage:
-#   docker compose up -d      # Start services
-#   docker compose down        # Stop services
-#   docker compose logs -f     # View logs
-#
-# Catatan optimasi disk (plan_optimasi.md Fase 0):
-#   - Temporal memakai postgres-app (container temporal-db dihapus)
-#   - temporal-ui dipindah ke docker-compose.dev.yml (khusus lokal)
-#   - Docling di-pin ke varian CPU (docling-serve-cpu) — bukan tag :latest
+# Catatan Fase 2 plan_optimasi.md: service Docling TIDAK lagi ada di stack.
+# Ekstraksi tabel memakai PyMuPDF native; Docling hanya dipakai eksternal
+# saat backfill dokumen (DOCLING_ENABLED=true), lihat app/ingestion/extractor.py.
 
 services:
   milvus-etcd:
@@ -128,30 +122,6 @@ services:
     networks:
       - enterprisemind_net
 
-  docling:
-    # Varian CPU resmi (~4.4 GB, bukan ~8.7 GB) + versi di-pin (bukan :latest).
-    # Fase 2 plan_optimasi.md akan menghapus service ini sepenuhnya.
-    image: quay.io/docling-project/docling-serve-cpu:v1.18.0
-    container_name: enterprisemind_docling
-    environment:
-      - DOCLING_SERVE_ENABLE_UI=true
-      - DOCLING_SERVE_MAX_SYNC_WAIT=1800
-      - DOCLING_SERVE_ENGINE=DoclingParseV2DocumentBackend
-      - DOCLING_NUM_THREADS=4
-    ports:
-      - "5001:5001"
-    volumes:
-      - docling_models:/root/.cache/huggingface
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
-    restart: unless-stopped
-    networks:
-      - enterprisemind_net
-
 volumes:
   milvus_etcd:
     driver: local
@@ -160,8 +130,6 @@ volumes:
   milvus_data:
     driver: local
   postgres_app_data:
-    driver: local
-  docling_models:
     driver: local
 
 networks:

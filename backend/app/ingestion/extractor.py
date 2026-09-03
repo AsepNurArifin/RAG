@@ -6,8 +6,9 @@ Extract text from PDF, DOCX, dan TXT files.
 Hybrid Extraction v3 untuk PDF:
 - PyMuPDF4LLM sebagai default extractor (cepat, akurat untuk teks)
 - page.find_tables() untuk deteksi tabel (akurat, bukan threshold manual)
-- Docling hanya untuk halaman dengan tabel
-- RapidOCR sebagai fallback ketika Docling gagal
+- Ekstraksi tabel native PyMuPDF (to_markdown) — pengganti Docling saat OFF
+- Docling (opsional, DOCLING_ENABLED=true) hanya untuk halaman dengan tabel
+- RapidOCR sebagai fallback ketika ekstraksi tabel gagal
 - Hash-based deduplication untuk efisiensi
 """
 import hashlib
@@ -27,7 +28,7 @@ class PageExtraction(TypedDict):
     """Hasil ekstraksi per halaman PDF."""
     page_number: int
     text: str
-    extraction_method: str  # "pymupdf4llm" | "docling" | "ocr" | "ocr_failed" | "docling_failed"
+    extraction_method: str  # "pymupdf4llm" | "pymupdf_table" | "docling" | "ocr" | "ocr_failed" | "docling_failed"
     source_file: str
     char_count: int
 
@@ -134,7 +135,8 @@ def _extract_txt(path: Path) -> str:
 
 def _extract_pdf(path: Path) -> str:
     """
-    Hybrid PDF extraction: PyMuPDF4LLM + Docling + OCR fallback.
+    Hybrid PDF extraction: PyMuPDF4LLM + tabel native PyMuPDF + OCR fallback.
+    Docling ikut dipakai hanya bila DOCLING_ENABLED=true.
     Mengembalikan string tunggal (backward compatibility).
     """
     pages = _extract_pdf_with_pages(path)
@@ -143,16 +145,18 @@ def _extract_pdf(path: Path) -> str:
 
 def _extract_pdf_with_pages(path: Path) -> list[PageExtraction]:
     """
-    Hybrid extraction v3: PyMuPDF4LLM + Docling + OCR fallback.
-    
+    Hybrid extraction v3: PyMuPDF4LLM + tabel (PyMuPDF/Docling) + OCR fallback.
+
     Alur:
     1. PyMuPDF4LLM → extract semua halaman (default, cepat, akurat untuk teks)
     2. page.find_tables() → deteksi halaman dengan tabel (akurat)
-    3. Halaman tabel → Docling (do_table_structure=True)
-    4. Jika Docling return <!-- image --> → RapidOCR fallback
-    5. Gabungkan hasil PyMuPDF4LLM + Docling + OCR
+    3. Halaman tabel → _extract_tables_pymupdf() (default) atau Docling bila DOCLING_ENABLED
+    4. Jika hasil tabel kosong/gagal/terlalu tipis → RapidOCR fallback
+    5. Gabungkan hasil PyMuPDF4LLM + tabel + OCR
     """
     import pymupdf4llm
+
+    from app.core.config import settings
 
     logger.info("Hybrid extraction v3: %s", path.name)
 
@@ -170,20 +174,30 @@ def _extract_pdf_with_pages(path: Path) -> list[PageExtraction]:
     table_pages = _detect_table_pages(path)
     logger.info("[Extractor] Tables found: %d pages %s", len(table_pages), table_pages)
 
-    # Step 3: Docling untuk halaman tabel
-    docling_results: dict[int, PageExtraction] = {}
+    # Step 3: Ekstraksi tabel — native PyMuPDF (default) atau Docling (opsional)
+    table_results: dict[int, PageExtraction] = {}
     if table_pages:
-        logger.info("[Extractor] Step 3: Docling extraction for %d table pages...", len(table_pages))
-        docling_results = _extract_with_docling_batched(
-            path, table_pages, do_table_structure=True
-        )
+        if settings.DOCLING_ENABLED:
+            logger.info(
+                "[Extractor] Step 3: Docling extraction for %d table pages...",
+                len(table_pages),
+            )
+            table_results = _extract_with_docling_batched(
+                path, table_pages, do_table_structure=True
+            )
+        else:
+            logger.info(
+                "[Extractor] Step 3: PyMuPDF table extraction for %d table pages...",
+                len(table_pages),
+            )
+            table_results = _extract_tables_pymupdf(path, table_pages)
 
-    # Step 4: OCR fallback untuk halaman yang Docling gagal
+    # Step 4: OCR fallback untuk halaman yang ekstraksi tabelnya gagal/kosong
     failed_pages = []
     for p in table_pages:
-        if p not in docling_results:
+        if p not in table_results:
             failed_pages.append(p)
-        elif re.search(r'<!-- (image|Start of picture)', docling_results[p]["text"]):
+        elif re.search(r'<!-- (image|Start of picture)', table_results[p]["text"]):
             failed_pages.append(p)
 
     ocr_results: dict[int, PageExtraction] = {}
@@ -197,11 +211,11 @@ def _extract_pdf_with_pages(path: Path) -> list[PageExtraction]:
 
     for i, page_data in enumerate(md_pages):
         if i in ocr_results:
-            # OCR results (Docling gagal)
+            # OCR results (ekstraksi tabel gagal)
             pages.append(ocr_results[i])
-        elif i in docling_results:
-            # Docling results (tabel berhasil extract)
-            pages.append(docling_results[i])
+        elif i in table_results:
+            # Table results (tabel berhasil diekstrak)
+            pages.append(table_results[i])
         else:
             # PyMuPDF4LLM results (default)
             text = page_data.get("text", "").strip()
@@ -251,6 +265,49 @@ def _detect_table_pages(path: Path) -> list[int]:
     doc.close()
 
     return table_pages
+
+
+def _extract_tables_pymupdf(path: Path, page_numbers: list[int]) -> dict[int, PageExtraction]:
+    """
+    Ekstraksi tabel native PyMuPDF → markdown.
+    Pengganti Docling untuk tabel digital (plan_optimasi.md Fase 2).
+
+    Halaman dengan hasil terlalu tipis (< 40 chars) TIDAK dimasukkan ke hasil
+    sehingga otomatis jatuh ke OCR fallback di Step 4.
+
+    Returns:
+        Dict mapping page_index → PageExtraction (method="pymupdf_table")
+    """
+    import pymupdf
+
+    results: dict[int, PageExtraction] = {}
+    doc = pymupdf.open(str(path))
+    try:
+        for i in page_numbers:
+            try:
+                page = doc[i]
+                tabs = page.find_tables()
+                if not tabs.tables:
+                    continue
+                parts = [page.get_text("text").strip()]
+                for t_idx, tab in enumerate(tabs.tables, 1):
+                    md = tab.to_markdown(clean=True)
+                    if md and md.strip():
+                        parts.append(f"\n**Tabel {t_idx} (hal. {i + 1}):**\n{md.strip()}")
+                text = clean_extraction_text(strip_watermarks("\n".join(parts).strip()))
+                if len(text) >= 40:  # guard: hasil terlalu tipis → biarkan OCR
+                    results[i] = PageExtraction(
+                        page_number=i + 1,
+                        text=text,
+                        extraction_method="pymupdf_table",
+                        source_file=path.name,
+                        char_count=len(text),
+                    )
+            except Exception as e:
+                logger.warning("[PyMuPDFTable] Gagal hal %d: %s", i + 1, e)
+    finally:
+        doc.close()
+    return results
 
 
 # ------------------------------------------------------------------ #

@@ -62,6 +62,14 @@ async def check_temporal() -> dict:
 
 
 async def check_docling() -> dict:
+    """Docling bersifat opsional (plan_optimasi.md Fase 2).
+
+    Saat DOCLING_ENABLED=false, probe ini dilaporkan sebagai 'disabled'
+    dan TIDAK dihitung sebagai degraded oleh readiness().
+    """
+    if not settings.DOCLING_ENABLED:
+        return {"service": "docling", "status": "disabled", "detail": "DOCLING_ENABLED=false"}
+
     async def _probe():
         import httpx
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -103,6 +111,8 @@ async def readiness() -> dict:
         "minio": minio,
         "temporal": temporal,
     }
+    # optional_down hanya menghitung status "down" — status "disabled" (mis. docling)
+    # dan "degraded" (mis. langfuse tanpa kredensial) TIDAK menurunkan readiness.
     optional = {
         "docling": docling,
         "llm": llm,

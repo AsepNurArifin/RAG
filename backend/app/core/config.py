@@ -55,7 +55,13 @@ class Settings:
     MILVUS_URI: str = field(default_factory=lambda: os.getenv("MILVUS_URI", "http://localhost:19530"))
     MILVUS_COLLECTION: str = field(default_factory=lambda: os.getenv("MILVUS_COLLECTION", "enterprisemind_documents"))
 
-    # Docling (Docker serve)
+    # Docling (Docker serve) — OPSIONAL. Default OFF agar VPS tetap ramping
+    # (plan_optimasi.md Fase 2). Saat OFF, ekstraksi tabel memakai jalur native
+    # PyMuPDF (find_tables().to_markdown()) + RapidOCR fallback.
+    # Nyalakan hanya untuk backfill dokumen bertabel kompleks via Docling eksternal.
+    DOCLING_ENABLED: bool = field(
+        default_factory=lambda: _safe_bool(os.getenv("DOCLING_ENABLED", "false"), "DOCLING_ENABLED")
+    )
     DOCLING_URL: str = field(default_factory=lambda: os.getenv("DOCLING_URL", "http://localhost:5001"))
 
     # Temporal
