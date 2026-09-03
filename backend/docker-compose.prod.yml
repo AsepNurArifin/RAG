@@ -2,19 +2,24 @@
 # Menambahkan service backend (FastAPI) dan worker (Temporal) berbasis image
 # yang sama, menggunakan hostname internal service untuk dependencies.
 #
-# Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Usage (deploy berbasis image — build dilakukan di CI/GHCR, lihat Fase 1):
+#   export IMAGE_TAG=<git-sha>            # deploy immutable
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # Env wajib disediakan via environment / .env (jangan commit secret):
 #   GROQ_API_KEY, JWT_SECRET_KEY, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
-#   POSTGRES_PASSWORD, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
+#   POSTGRES_PASSWORD, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD,
+#   BACKEND_IMAGE (default: ghcr.io/<owner>/enterprisemind-backend)
+
+# Image GHCR yang di-pull VPS. BACKEND_IMAGE memakai nama default
+# ghcr.io/<owner>/enterprisemind-backend — set di .env bila berbeda.
+x-backend-image: &backend-image
+  image: ${BACKEND_IMAGE:-ghcr.io/enterprisemind-ai/enterprisemind-backend}:${IMAGE_TAG:-latest}
 
 services:
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: enterprisemind_backend:latest
+    <<: *backend-image
     container_name: enterprisemind_backend
     restart: unless-stopped
     environment:
@@ -55,7 +60,7 @@ services:
       - enterprisemind_net
 
   worker:
-    image: enterprisemind_backend:latest
+    <<: *backend-image
     container_name: enterprisemind_worker
 
     restart: unless-stopped
